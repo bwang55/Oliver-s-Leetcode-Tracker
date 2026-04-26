@@ -60,8 +60,11 @@ function AppInner({ user, signOut }) {
   const onToggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   const onComposerSubmit = (text) => {
-    // Open the chat drawer with the pasted text as the curator's first message.
-    setPendingChatMessage(text);
+    // The composer paste is unambiguously "user just solved a problem, please add it".
+    // Prepend a hint so the orchestrator's intent classifier doesn't get confused by
+    // a raw code dump and route to Analyst (which would just write a code review).
+    const framed = `I just solved this Leetcode problem. Please add it to my tracker.\n\n\`\`\`\n${text}\n\`\`\``;
+    setPendingChatMessage(framed);
     setChatOpen(true);
   };
 
