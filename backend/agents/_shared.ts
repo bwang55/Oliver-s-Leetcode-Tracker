@@ -26,6 +26,8 @@ export async function* runAgent(
     model: string;
     history: AgentMessage[];
     userMessage: string;
+    /** Force a specific tool on the FIRST iteration only. Subsequent iterations use "auto". */
+    forceToolFirstTurn?: string;
   }
 ): AsyncIterable<AgentEvent> {
   const start = Date.now();
@@ -48,11 +50,18 @@ export async function* runAgent(
     if (Date.now() - start > AGENT_TIMEOUT_MS) throw new Error("AGENT_TIMEOUT");
     iter++;
 
+    // Only force the tool on the very first turn. After that, let the model decide
+    // (it might want to text-respond after the forced tool result lands).
+    const toolChoice = (iter === 1 && args.forceToolFirstTurn)
+      ? { type: "function" as const, function: { name: args.forceToolFirstTurn } }
+      : undefined;
+
     const resp = await ctx.openai.chat.completions.create({
       model: args.model,
       max_completion_tokens: 2048,
       tools: tools as any,
-      messages
+      messages,
+      ...(toolChoice ? { tool_choice: toolChoice } : {})
     });
 
     const message = resp.choices[0].message;

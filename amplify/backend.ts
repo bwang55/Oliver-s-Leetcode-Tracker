@@ -6,6 +6,7 @@ import { Duration, Stack } from "aws-cdk-lib";
 import { Bucket, StorageClass } from "aws-cdk-lib/aws-s3";
 import { FunctionUrlAuthType, InvokeMode, HttpMethod } from "aws-cdk-lib/aws-lambda";
 import { OAuthScope } from "aws-cdk-lib/aws-cognito";
+import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { auth } from "./auth/resource.js";
 import { data } from "./data/resource.js";
 import { exportsBucket, aiLogsBucket } from "./storage/resource.js";
@@ -77,6 +78,15 @@ backend.data.resources.tables["RateLimit"].grantReadWriteData(mcpLambda);
 backend.data.resources.tables["User"].grantReadData(mcpLambda);
 backend.aiLogsBucket.resources.bucket.grantWrite(mcpLambda);
 
+// Same GSI workaround as chatStream (see comment below the chat-stream block):
+// grantReadWriteData on Amplify-Gen-2-managed tables doesn't include `index/*`.
+mcpLambda.addToRolePolicy(new PolicyStatement({
+  actions: ["dynamodb:Query", "dynamodb:Scan"],
+  resources: [
+    `${backend.data.resources.tables["Problem"].tableArn}/index/*`
+  ]
+}));
+
 // Env vars — table names, bucket names, Cognito coordinates for JWT verification.
 backend.mcpServer.addEnvironment("PROBLEM_TABLE", backend.data.resources.tables["Problem"].tableName);
 backend.mcpServer.addEnvironment("USER_TABLE", backend.data.resources.tables["User"].tableName);
@@ -140,6 +150,17 @@ backend.data.resources.tables["RateLimit"].grantReadWriteData(chatLambda);
 backend.data.resources.tables["User"].grantReadData(chatLambda);
 backend.data.resources.tables["ChatSession"].grantReadWriteData(chatLambda);
 backend.aiLogsBucket.resources.bucket.grantWrite(chatLambda);
+
+// CDK's grantReadWriteData on Amplify-Gen-2-managed tables doesn't include the
+// `${tableArn}/index/*` resource ARN, so Query against GSIs (e.g. byUserAndDate)
+// gets a "no identity-based policy allows dynamodb:Query" error. Add it explicitly.
+chatLambda.addToRolePolicy(new PolicyStatement({
+  actions: ["dynamodb:Query", "dynamodb:Scan"],
+  resources: [
+    `${backend.data.resources.tables["Problem"].tableArn}/index/*`,
+    `${backend.data.resources.tables["ChatSession"].tableArn}/index/*`
+  ]
+}));
 
 backend.chatStream.addEnvironment("PROBLEM_TABLE", backend.data.resources.tables["Problem"].tableName);
 backend.chatStream.addEnvironment("USER_TABLE", backend.data.resources.tables["User"].tableName);

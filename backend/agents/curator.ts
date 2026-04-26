@@ -11,6 +11,17 @@ const SYSTEM_PROMPT = `You are Leetcode Tracker's content curator. The user desc
 
 const ALLOWED_TOOLS = ["add_problem", "update_problem", "delete_problem", "get_problem"];
 
+// Heuristic: detect code-like content. Triggers when the message contains common
+// language constructs across Python / C++ / Java / JS / Rust / Go.
+function looksLikeCode(s: string): boolean {
+  return (
+    /\b(def|class|function|public\s+(?:int|void|class|static)|fn\s+\w+|func\s+\w+|return)\b/.test(s) ||
+    /\bimport\s+\w+|#include\s*</.test(s) ||
+    /[{};]\s*$/.test(s.split("\n").slice(0, 30).join("\n")) ||
+    /```[\w]*\n/.test(s)
+  );
+}
+
 export function runCurator(
   ctx: ToolContext, history: AgentMessage[], userMessage: string
 ): AsyncIterable<AgentEvent> {
@@ -19,6 +30,10 @@ export function runCurator(
     systemPrompt: SYSTEM_PROMPT,
     allowedTools: ALLOWED_TOOLS,
     model: ctx.env.OPENAI_MODEL_REASONING,
-    history, userMessage
+    history,
+    userMessage,
+    // If the user pasted code, force `add_problem` on the first turn so the model
+    // can't decide to lecture instead of saving.
+    forceToolFirstTurn: looksLikeCode(userMessage) ? "add_problem" : undefined
   });
 }

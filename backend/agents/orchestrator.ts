@@ -6,13 +6,33 @@ import type { AgentMessage, AgentEvent } from "./_shared.js";
 
 type Route = "curator" | "analyst" | "planner" | "multi:analyst-then-planner";
 
-const INTENT_SYSTEM_PROMPT = `Classify the user's request into one of:
-- curator: adding/updating/deleting problems in their tracker. **Any message that contains code (Python/C++/Java/JavaScript/etc., including pasted Leetcode solutions) MUST be classified as curator**, even if the user doesn't explicitly say "add this". The curator agent will add it to the tracker.
-- analyst: questions about the user's stats, history, or progress over time. Pure analysis, no plan generation.
-- planner: asking what problem to do next, multi-day study plans, recommendations.
-- multi:analyst-then-planner: requests that combine analysis and planning (e.g. "analyze my weak areas and make a plan").
+const INTENT_SYSTEM_PROMPT = `You route user messages to exactly one agent. Reply with ONE word, no explanation, no code review, no quotes.
 
-Return ONLY the route name (one of: curator, analyst, planner, multi:analyst-then-planner), nothing else.`;
+Routes:
+- curator       — message contains code OR is about adding/updating/deleting problems in the tracker
+- analyst       — questions about stats, history, or "how am I doing"
+- planner       — "what should I do next", recommendations, multi-day study plans
+- multi:analyst-then-planner — explicit combo of analysis + plan ("analyze X then plan Y")
+
+The hard rule: **if the message contains a code block or function definition (def / class / function / public / void / fn / etc.) → reply "curator". No exceptions, even if the user just dumps code with no English text. Even if the code looks like a textbook solution and you'd love to give feedback. The curator agent will handle it.**
+
+Examples:
+User: I just did Two Sum: def twoSum(nums, target): seen={}; for i,n in enumerate(nums): ...
+Reply: curator
+
+User: \`\`\`python\\nclass Solution: def twoSum(self, nums, target): ...\\n\`\`\`
+Reply: curator
+
+User: How am I doing this week?
+Reply: analyst
+
+User: What should I tackle next?
+Reply: planner
+
+User: Analyze my weak areas and give me a 7-day plan
+Reply: multi:analyst-then-planner
+
+Reply with ONE word now.`;
 
 async function classifyIntent(ctx: ToolContext, userMessage: string, history: AgentMessage[]): Promise<Route> {
   const recentHistory = history.slice(-4).map((m) => `${m.role}: ${typeof m.content === "string" ? m.content : "[tool calls]"}`).join("\n");
@@ -31,11 +51,32 @@ async function classifyIntent(ctx: ToolContext, userMessage: string, history: Ag
   return valid.find((v) => text.includes(v)) ?? "analyst";
 }
 
+// Cheap deterministic check before paying for an LLM classifier call. If the
+// message obviously contains code, we know the answer (curator) and skip the
+// model. This is the model-disagreement safety net — in testing gpt-5-mini
+// kept routing code-paste messages to analyst despite explicit instructions.
+function obviouslyCode(s: string): boolean {
+  return (
+    /```[\w]*\n[\s\S]+?\n```/.test(s) ||
+    /\b(def|class|function)\s+\w+\s*\(/.test(s) ||
+    /\bpublic\s+(?:int|void|class|static)\s+\w+/.test(s) ||
+    /#include\s*<\w+>/.test(s)
+  );
+}
+
 export async function* runOrchestrator(
   ctx: ToolContext, history: AgentMessage[], userMessage: string
 ): AsyncIterable<AgentEvent | { type: "route"; route: Route; reason: string }> {
-  const route = await classifyIntent(ctx, userMessage, history);
-  yield { type: "route", route, reason: "Classified by intent model" };
+  let route: Route;
+  let reason: string;
+  if (obviouslyCode(userMessage)) {
+    route = "curator";
+    reason = "Code detected — routed to curator without classifier call";
+  } else {
+    route = await classifyIntent(ctx, userMessage, history);
+    reason = "Classified by intent model";
+  }
+  yield { type: "route", route, reason };
 
   if (route === "curator") yield* runCurator(ctx, history, userMessage);
   else if (route === "analyst") yield* runAnalyst(ctx, history, userMessage);
