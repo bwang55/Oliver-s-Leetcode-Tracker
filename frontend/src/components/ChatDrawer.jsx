@@ -17,13 +17,31 @@ function ChatDrawer({ pendingMessage, onSessionUpdated }) {
   const [streaming, setStreaming] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [route, setRoute] = useState(null);
+  // Mobile (<= 900px viewport): the panel takes the full screen as an overlay
+  // when expanded, and collapses to a floating button. Desktop: always docked.
+  const [isMobile, setIsMobile] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const bodyRef = useRef(null);
   const lastSentTsRef = useRef(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const apply = () => {
+      setIsMobile(mq.matches);
+      setCollapsed(mq.matches);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     if (!pendingMessage || streaming) return;
     if (pendingMessage.ts === lastSentTsRef.current) return;
     lastSentTsRef.current = pendingMessage.ts;
+    // Auto-expand if the parent pushed a message (e.g. composer paste) so the
+    // user can see what the agent is doing.
+    setCollapsed(false);
     send(pendingMessage.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingMessage]);
@@ -118,19 +136,44 @@ function ChatDrawer({ pendingMessage, onSessionUpdated }) {
     setInput("");
   };
 
+  if (isMobile && collapsed) {
+    return (
+      <button
+        className="chat-fab"
+        onClick={() => setCollapsed(false)}
+        aria-label="Open assistant"
+        title="Assistant"
+      >
+        💬
+      </button>
+    );
+  }
+
   return (
-    <aside className="chat-panel">
+    <aside className={`chat-panel ${isMobile ? "chat-panel-overlay" : ""}`}>
       <div className="chat-panel-head">
         <h3>Assistant {route && <span className="chat-panel-route">· {route}</span>}</h3>
-        <button
-          className="chat-panel-clear"
-          onClick={clearChat}
-          disabled={streaming || events.length === 0}
-          aria-label="New conversation"
-          title="New conversation"
-        >
-          New
-        </button>
+        <div className="chat-panel-head-actions">
+          <button
+            className="chat-panel-clear"
+            onClick={clearChat}
+            disabled={streaming || events.length === 0}
+            aria-label="New conversation"
+            title="New conversation"
+          >
+            New
+          </button>
+          {isMobile && (
+            <button
+              className="chat-panel-close"
+              onClick={() => setCollapsed(true)}
+              aria-label="Close assistant"
+              title="Close"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
       <div className="chat-panel-body" ref={bodyRef}>
         {events.length === 0 && (

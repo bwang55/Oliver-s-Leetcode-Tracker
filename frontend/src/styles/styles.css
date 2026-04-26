@@ -188,14 +188,16 @@ textarea {
   margin: 0 auto;
   padding:
     calc(56px + env(safe-area-inset-top))
-    max(clamp(24px, 5vw, 96px), env(safe-area-inset-right))
+    max(clamp(20px, 3vw, 72px), env(safe-area-inset-right))
     calc(120px + env(safe-area-inset-bottom))
-    max(clamp(24px, 5vw, 96px), env(safe-area-inset-left));
+    max(clamp(20px, 3vw, 72px), env(safe-area-inset-left));
 }
-@media (min-width: 1600px) {
+/* Bigger horizontal margins only when there's plenty of room — beyond the
+ * 1500px hero breakpoint plus the 420px chat panel = ~1920px viewport. */
+@media (min-width: 1920px) {
   .app {
-    padding-left: max(clamp(96px, 8vw, 160px), env(safe-area-inset-left));
-    padding-right: max(clamp(96px, 8vw, 160px), env(safe-area-inset-right));
+    padding-left: max(clamp(72px, 6vw, 128px), env(safe-area-inset-left));
+    padding-right: max(clamp(72px, 6vw, 128px), env(safe-area-inset-right));
   }
 }
 @media (max-width: 700px) {
@@ -336,13 +338,16 @@ textarea {
   align-items: stretch;
   margin-bottom: 48px;
 }
-@media (max-width: 1200px) {
+/* Bumped breakpoints up because the chat panel eats 420px of viewport on the
+ * right. Effective `.app` width = viewport - 420. We want 3 cols only when
+ * effective width is comfortable (>= ~1080), 2 cols for medium, 1 col when narrow. */
+@media (max-width: 1500px) {
   .hero {
     grid-template-columns: 1fr 1fr;
   }
   .hero > .hero-date-wrap { grid-column: 1 / -1; }
 }
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .hero {
     grid-template-columns: 1fr;
   }
@@ -1589,19 +1594,66 @@ pre.code-data {
   box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
-/* Mobile: stack the chat below the main content rather than next to it. */
+.chat-panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-panel-close {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink-soft);
+  padding: 2px 10px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.chat-panel-close:hover { background: var(--bg-sunken); color: var(--ink); }
+
+/* Floating Action Button — appears on mobile when the chat is collapsed. */
+.chat-fab {
+  position: fixed;
+  right: calc(20px + env(safe-area-inset-right));
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 22px;
+  border: 0;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow: var(--shadow-pop);
+  display: grid;
+  place-items: center;
+  transition: transform 180ms var(--ease-spring), background 220ms var(--ease-out);
+}
+.chat-fab:hover {
+  transform: scale(1.06);
+}
+
+/* Mobile: chat takes over as a full-screen overlay when expanded. */
 @media (max-width: 900px) {
-  .layout-shell {
-    flex-direction: column;
-  }
-  .chat-panel {
-    flex: 0 0 auto;
+  .chat-panel-overlay {
+    position: fixed;
+    inset: 0;
     width: 100%;
-    height: auto;
-    max-height: 60vh;
-    position: relative;
-    top: auto;
+    height: 100vh;
+    z-index: 250;
     border-left: none;
-    border-top: 1px solid var(--line);
+    border-top: none;
+    flex: none;
+    animation: drawerFadeIn 200ms var(--ease-out);
   }
+  @keyframes drawerFadeIn {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Desktop: hide FAB. */
+@media (min-width: 901px) {
+  .chat-fab { display: none; }
 }
