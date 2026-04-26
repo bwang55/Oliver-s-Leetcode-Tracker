@@ -35,6 +35,11 @@ const Icon = {
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...p}>
       <path d="M13.5 9.5A6 6 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7Z" />
     </svg>
+  ),
+  Chat: (p) => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M3 5h10a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H7l-3 2v-2H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+    </svg>
   )
 };
 

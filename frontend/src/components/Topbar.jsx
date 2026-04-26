@@ -19,6 +19,9 @@ function Topbar(props) {
         <span>Leetcode Tracker</span>
       </div>
       <div className="topbar-actions">
+        <button className="icon-btn" aria-label="Open chat" onClick={props.onOpenChat}>
+          <Icon.Chat />
+        </button>
         <button className="icon-btn" aria-label="Search" onClick={props.onSearch}>
           <Icon.Search />
         </button>

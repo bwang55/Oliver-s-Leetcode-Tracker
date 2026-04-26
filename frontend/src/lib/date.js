@@ -39,3 +39,21 @@ export function isoDayKey(iso) {
   d.setHours(0, 0, 0, 0);
   return d.toISOString().slice(0, 10);
 }
+
+export function buildHeatmapFromProblems(problems) {
+  const cells = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const counts = new Map();
+  for (const p of problems) {
+    const k = isoDayKey(p.solvedAt);
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  for (let i = 111; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    cells.push({ count: counts.get(key) || 0, dateIso: d.toISOString() });
+  }
+  return cells;
+}
