@@ -2,6 +2,8 @@
   "extends": "../backend/tsconfig.json",
   "compilerOptions": {
     "declaration": false,
+    "noEmit": true,
+    "rootDir": "..",
     "typeRoots": ["./node_modules/@types", "../backend/node_modules/@types"]
   },
   "include": ["./**/*.ts", "../backend/**/*.ts"]
