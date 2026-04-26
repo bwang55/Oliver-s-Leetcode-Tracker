@@ -7,7 +7,13 @@ applications:
           commands:
             # `appRoot: frontend` pins cwd to frontend/, so paths here are
             # relative to that — not to the repo root.
-            - npm ci
+            #
+            # `npm install` (not `npm ci`) — same Amplify-CDK bundled-deps
+            # issue as the backend phase: CI's npm rejects perfectly valid
+            # lockfiles with "Missing: fast-xml-parser@... from lock file".
+            # install relaxes that strict check while still honoring lockfile
+            # versions.
+            - npm install
         build:
           commands:
             - npm run build
