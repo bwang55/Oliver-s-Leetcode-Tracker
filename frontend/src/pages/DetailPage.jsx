@@ -8,6 +8,10 @@ import { fmtDayHeader, fmtTime } from "../lib/date.js";
 function DetailPage({ problem, onBack, onUpdate }) {
   const head = fmtDayHeader(problem.solvedAt);
   const setTags = (tags) => onUpdate({ ...problem, tags });
+  console.log("[DetailPage]", problem.id, problem.number, problem.title,
+    "| solutions type:", typeof problem.solutions,
+    "| keys:", problem.solutions && typeof problem.solutions === "object" ? Object.keys(problem.solutions) : "(not object)",
+    "| python length:", problem.solutions?.python?.length ?? "n/a");
   return (
     <div className="detail">
       <button className="back-btn" onClick={onBack}>
