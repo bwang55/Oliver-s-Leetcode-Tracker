@@ -19,12 +19,15 @@ applications:
             # that would attempt frontend/frontend which doesn't exist.
             - npm run build
       artifacts:
-        baseDirectory: frontend/dist
+        # baseDirectory is relative to appRoot, so `dist` here resolves to
+        # frontend/dist from repo root. Don't write `frontend/dist` — Amplify
+        # would prepend appRoot again and look for frontend/frontend/dist.
+        baseDirectory: dist
         files:
           - '**/*'
       cache:
         paths:
-          - frontend/node_modules/**/*
+          - node_modules/**/*
     backend:
       phases:
         build:
