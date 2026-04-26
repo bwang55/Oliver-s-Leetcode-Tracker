@@ -18,7 +18,7 @@ async function classifyIntent(ctx: ToolContext, userMessage: string, history: Ag
   const recentHistory = history.slice(-4).map((m) => `${m.role}: ${typeof m.content === "string" ? m.content : "[tool calls]"}`).join("\n");
   const resp = await ctx.openai.chat.completions.create({
     model: ctx.env.OPENAI_MODEL_INTENT,
-    max_tokens: 50,
+    max_completion_tokens: 50,
     messages: [
       { role: "system", content: INTENT_SYSTEM_PROMPT },
       { role: "user", content: `Recent history:\n${recentHistory}\n\nUser: ${userMessage}` }

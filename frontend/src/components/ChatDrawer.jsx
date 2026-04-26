@@ -65,6 +65,13 @@ function ChatDrawer({ open, onClose, initialMessage, onSessionUpdated }) {
         if (ev.type === "session_saved") {
           if (onSessionUpdated) onSessionUpdated(ev.data.sessionId);
         }
+        if (ev.type === "error") {
+          setMessages((m) => [...m, { role: "assistant", content: "⚠ " + (ev.data.message || "Backend error") }]);
+        }
+        if (ev.type === "session_save_failed") {
+          // Non-fatal — the user already saw the assistant's reply, just log.
+          console.warn("session save failed:", ev.data.error);
+        }
       }
     } catch (e) {
       setMessages((m) => [...m, { role: "assistant", content: "Error: " + e.message }]);

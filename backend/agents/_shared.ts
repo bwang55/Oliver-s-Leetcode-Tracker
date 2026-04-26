@@ -50,7 +50,7 @@ export async function* runAgent(
 
     const resp = await ctx.openai.chat.completions.create({
       model: args.model,
-      max_tokens: 2048,
+      max_completion_tokens: 2048,
       tools: tools as any,
       messages
     });

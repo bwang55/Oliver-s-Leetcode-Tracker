@@ -47,7 +47,7 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
   const requestId = randomUUID();
   const requestPayload = {
     model: ctx.env.OPENAI_MODEL_EXTRACTION,
-    max_tokens: 1024,
+    max_completion_tokens: 1024,
     messages: [
       { role: "system" as const, content: EXTRACTION_SYSTEM_PROMPT },
       { role: "user" as const, content: solutionText }

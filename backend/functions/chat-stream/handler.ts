@@ -251,35 +251,44 @@ const streamHandler = async (event: LambdaUrlEvent, responseStream: any /*, cont
   let finalAssistantMessage = "";
   let lastRoute = session.agentRoute;
   try {
-    for await (const ev of runOrchestrator(ctx, session.messages, message)) {
-      writeEvent(ev.type, ev);
-      if ((ev as any).type === "route") lastRoute = (ev as any).route;
-      if (ev.type === "done") finalAssistantMessage = (ev as any).finalMessage ?? "";
+    try {
+      for await (const ev of runOrchestrator(ctx, session.messages, message)) {
+        writeEvent(ev.type, ev);
+        if ((ev as any).type === "route") lastRoute = (ev as any).route;
+        if (ev.type === "done") finalAssistantMessage = (ev as any).finalMessage ?? "";
+      }
+    } catch (err: any) {
+      console.error("chat-stream orchestrator error", err);
+      writeEvent("error", { message: err?.message ?? "orchestrator_failed" });
     }
-  } catch (err: any) {
-    console.error("chat-stream orchestrator error", err);
-    writeEvent("error", { message: err?.message ?? "orchestrator_failed" });
-  }
 
-  // 6. Persist updated session
-  const updated: ChatSessionRow = {
-    ...session,
-    agentRoute: lastRoute,
-    messages: [
-      ...session.messages,
-      userMessage,
-      { role: "assistant", content: finalAssistantMessage }
-    ]
-  };
-  try {
-    await saveSession(updated);
-    writeEvent("session_saved", { sessionId: session.id });
-  } catch (err: any) {
-    console.error("chat-stream saveSession error", err);
-    writeEvent("session_save_failed", { error: err?.message ?? "save_failed" });
+    // 6. Persist updated session — bound to 5s so a stuck DDB write can't hang the
+    // Lambda for the full 60s timeout. The user's message + any partial assistant
+    // reply gets persisted on a best-effort basis.
+    const updated: ChatSessionRow = {
+      ...session,
+      agentRoute: lastRoute,
+      messages: [
+        ...session.messages,
+        userMessage,
+        { role: "assistant", content: finalAssistantMessage }
+      ]
+    };
+    try {
+      await Promise.race([
+        saveSession(updated),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("save_timeout")), 5000))
+      ]);
+      writeEvent("session_saved", { sessionId: session.id });
+    } catch (err: any) {
+      console.error("chat-stream saveSession error", err);
+      writeEvent("session_save_failed", { error: err?.message ?? "save_failed" });
+    }
+  } finally {
+    // Always close the SSE stream; otherwise the Lambda hangs until its 60s timeout
+    // even if every code path above returned cleanly.
+    try { sse.end(); } catch { /* already ended */ }
   }
-
-  sse.end();
 };
 
 // AWS Lambda's response-stream runtime exposes `awslambda.streamifyResponse` as a
