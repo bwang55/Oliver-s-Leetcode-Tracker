@@ -13,6 +13,7 @@ import { exportData } from "./functions/export-data/resource.js";
 import { postConfirmation } from "./auth/post-confirmation/resource.js";
 import { mcpServer } from "./functions/mcp-server/resource.js";
 import { chatStream } from "./functions/chat-stream/resource.js";
+import { defineMonitoring } from "../backend/monitoring/resource.js";
 
 export const backend = defineBackend({
   auth,
@@ -164,3 +165,30 @@ const chatFnUrl = chatLambda.addFunctionUrl({
 });
 
 backend.addOutput({ custom: { chatStreamUrl: chatFnUrl.url } });
+
+// ---------------------------------------------------------------------------
+// Phase 7: Monitoring (CloudWatch alarms + SNS topic)
+// ---------------------------------------------------------------------------
+
+const monitoringStack = backend.createStack("Monitoring");
+
+// postConfirmation may not always be wired (Phase 2 Task 2.5 restructure decoupled it
+// from the Cognito trigger to break a circular nested-stack dependency). If we can't
+// find a function name, skip its alarm rather than blocking the deploy.
+let postConfirmationFnName: string | undefined;
+try {
+  postConfirmationFnName = backend.postConfirmation.resources.lambda.functionName;
+} catch {
+  postConfirmationFnName = undefined;
+}
+
+defineMonitoring(monitoringStack, {
+  alarmEmail: process.env.OPS_ALARM_EMAIL || "ops@example.com",
+  lambdaFunctionNames: {
+    chatStream: backend.chatStream.resources.lambda.functionName,
+    mcpServer: backend.mcpServer.resources.lambda.functionName,
+    exportData: backend.exportData.resources.lambda.functionName,
+    postConfirmation: postConfirmationFnName
+  },
+  appsyncApiId: backend.data.resources.cfnResources.cfnGraphqlApi.attrApiId
+});
