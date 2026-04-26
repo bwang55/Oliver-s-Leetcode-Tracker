@@ -3,6 +3,7 @@ import { updateProblemTool } from "./update-problem.js";
 import { deleteProblemTool } from "./delete-problem.js";
 import { listProblemsTool } from "./list-problems.js";
 import { getProblemTool } from "./get-problem.js";
+import { findProblemTool } from "./find-problem.js";
 import { analyzeProfileTool } from "./analyze-profile.js";
 import { suggestNextProblemTool } from "./suggest-next-problem.js";
 import { generateStudyPlanTool } from "./generate-study-plan.js";
@@ -15,6 +16,7 @@ export const ALL_TOOLS: Record<string, ToolDefinition<any, any>> = {
   delete_problem: deleteProblemTool,
   list_problems: listProblemsTool,
   get_problem: getProblemTool,
+  find_problem: findProblemTool,
   analyze_profile: analyzeProfileTool,
   suggest_next_problem: suggestNextProblemTool,
   generate_study_plan: generateStudyPlanTool,
