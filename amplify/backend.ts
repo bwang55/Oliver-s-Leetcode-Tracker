@@ -133,8 +133,17 @@ const mcpAppClient = backend.auth.resources.userPool.addClient("mcpClient", {
 backend.mcpServer.addEnvironment("MCP_OAUTH_CLIENT_ID", mcpAppClient.userPoolClientId);
 
 // Cognito hosted-UI domain — required for the authorization-code grant flow.
+// Domain prefixes are GLOBALLY UNIQUE within a region, so sandbox and every
+// branch deploy must compute a different prefix. The Amplify Hosting CI sets
+// `AWS_BRANCH` (e.g. "main") for pipeline deploys; local sandbox doesn't, so
+// we fall back to "sandbox". This way each branch + sandbox each own their
+// own Cognito domain and never collide on `CREATE_FAILED: Domain already exists`.
 const cognitoAccount = Stack.of(backend.auth.resources.userPool).account;
-const cognitoDomainPrefix = `lc-tracker-${cognitoAccount}`;
+const envSuffix = (process.env.AWS_BRANCH || "sandbox")
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, "")
+  .slice(0, 16);
+const cognitoDomainPrefix = `lc-tracker-${cognitoAccount}-${envSuffix}`;
 backend.auth.resources.userPool.addDomain("CognitoDomain", {
   cognitoDomain: { domainPrefix: cognitoDomainPrefix }
 });

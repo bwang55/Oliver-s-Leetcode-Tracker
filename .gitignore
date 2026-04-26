@@ -10,3 +10,7 @@ openai_key
 *.pem
 *.key
 .secrets/
+
+# Personal interview / analysis notes — keep private
+INTERVIEW_NOTES_AI.md
+INTERVIEW_NOTES*.md
