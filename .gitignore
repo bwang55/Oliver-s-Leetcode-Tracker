@@ -1,0 +1,12 @@
+node_modules/
+.amplify/
+amplify_outputs.json
+.DS_Store
+.env.local
+.env.*.local
+
+# Secrets — never commit
+openai_key
+*.pem
+*.key
+.secrets/
