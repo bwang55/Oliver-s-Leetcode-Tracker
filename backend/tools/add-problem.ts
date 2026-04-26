@@ -102,8 +102,8 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
   // 3. Persist Problem
   const id = randomUUID();
   const lang = extraction.language === "other" ? "python" : extraction.language;
-  const solutions: Record<string, string> = { python: "", cpp: "", java: "" };
-  solutions[lang] = solutionText;
+  const solutionsObj: Record<string, string> = { python: "", cpp: "", java: "" };
+  solutionsObj[lang] = solutionText;
   const now = new Date().toISOString();
   const item = {
     id, userId: ctx.userId,
@@ -114,7 +114,11 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
     solvedAt: now,
     description: extraction.description,
     constraints: extraction.constraints,
-    solutions,
+    // schema declares `solutions: a.json()` which is AWSJSON — a JSON string on
+    // the wire. If we put a DDB Map here AppSync can't serialize it back through
+    // the model resolver and the frontend sees null. Stringify so the AWSJSON
+    // resolver round-trips correctly.
+    solutions: JSON.stringify(solutionsObj),
     note: "",
     createdAt: now,
     updatedAt: now,

@@ -36,10 +36,23 @@ export async function ensureUser(userId, email) {
   throw new Error(errorMsg || "ensureUser: create failed");
 }
 
+// `solutions` is an AWSJSON field in the schema. Depending on amplify-js client
+// behavior it may come back as a string or an object — normalize to object so
+// `CodeBlock` can do `solutions[lang]`.
+function normalizeProblem(p) {
+  if (!p) return p;
+  let s = p.solutions;
+  if (typeof s === "string") {
+    try { s = JSON.parse(s); } catch { s = null; }
+  }
+  return { ...p, solutions: s };
+}
+
 export async function listMyProblems() {
   const out = await client.models.Problem.list({ limit: 1000 });
   if (out.errors?.length) throw new Error(out.errors[0].message);
-  return (out.data || []).sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt));
+  const items = (out.data || []).map(normalizeProblem);
+  return items.sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt));
 }
 
 export async function updateMyDailyTarget(userId, dailyTarget) {
