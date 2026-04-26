@@ -1,0 +1,53 @@
+import type { ToolContext } from "../tools/_types.js";
+import { runCurator } from "./curator.js";
+import { runAnalyst } from "./analyst.js";
+import { runPlanner } from "./planner.js";
+import type { AgentMessage, AgentEvent } from "./_shared.js";
+
+type Route = "curator" | "analyst" | "planner" | "multi:analyst-then-planner";
+
+const INTENT_SYSTEM_PROMPT = `Classify the user's request into one of:
+- curator: adding/updating/deleting problems in their tracker (especially when they paste code)
+- analyst: questions about their stats, history, or progress
+- planner: asking for what to do next, recommendations, or multi-day study plans
+- multi:analyst-then-planner: requests that combine analysis and planning ("analyze my weak areas and make a plan")
+
+Return ONLY the route name, nothing else.`;
+
+async function classifyIntent(ctx: ToolContext, userMessage: string, history: AgentMessage[]): Promise<Route> {
+  const recentHistory = history.slice(-4).map((m) => `${m.role}: ${typeof m.content === "string" ? m.content : "[tool calls]"}`).join("\n");
+  const resp = await ctx.openai.chat.completions.create({
+    model: ctx.env.OPENAI_MODEL_INTENT,
+    max_tokens: 50,
+    messages: [
+      { role: "system", content: INTENT_SYSTEM_PROMPT },
+      { role: "user", content: `Recent history:\n${recentHistory}\n\nUser: ${userMessage}` }
+    ]
+  });
+  const text = resp.choices[0]?.message?.content?.trim().toLowerCase() ?? "analyst";
+  const valid: Route[] = ["curator", "analyst", "planner", "multi:analyst-then-planner"];
+  // Check most-specific first (multi: substring contains "analyst" and "planner" too)
+  if (text.includes("multi")) return "multi:analyst-then-planner";
+  return valid.find((v) => text.includes(v)) ?? "analyst";
+}
+
+export async function* runOrchestrator(
+  ctx: ToolContext, history: AgentMessage[], userMessage: string
+): AsyncIterable<AgentEvent | { type: "route"; route: Route; reason: string }> {
+  const route = await classifyIntent(ctx, userMessage, history);
+  yield { type: "route", route, reason: "Classified by intent model" };
+
+  if (route === "curator") yield* runCurator(ctx, history, userMessage);
+  else if (route === "analyst") yield* runAnalyst(ctx, history, userMessage);
+  else if (route === "planner") yield* runPlanner(ctx, history, userMessage);
+  else {
+    // multi:analyst-then-planner
+    let analystSummary = "";
+    for await (const ev of runAnalyst(ctx, history, userMessage)) {
+      yield ev;
+      if (ev.type === "done") analystSummary = ev.finalMessage;
+    }
+    const augmented = `Based on the analyst's findings:\n\n${analystSummary}\n\nNow generate a plan for: ${userMessage}`;
+    yield* runPlanner(ctx, history, augmented);
+  }
+}
