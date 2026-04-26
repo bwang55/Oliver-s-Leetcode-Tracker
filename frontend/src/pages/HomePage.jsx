@@ -24,7 +24,7 @@ function groupByDay(problems) {
 
 function HomePage(props) {
   const {
-    problems, pending, heatmap, target, theme,
+    problems, pending, target, theme,
     onAdjustTarget, onComposerSubmit, onOpenProblem, onToggleTheme, showToast,
     onSignOut
   } = props;
@@ -57,7 +57,7 @@ function HomePage(props) {
       />
       <section className="hero">
         <HeroDate todayCount={todayDone} target={target} />
-        <Heatmap cells={heatmap} onCellClick={onCellClick} />
+        <Heatmap problems={problems} onCellClick={onCellClick} />
         <ProgressCard done={todayDone} target={target} onAdjust={onAdjustTarget} />
       </section>
       <Composer onSubmit={onComposerSubmit} />

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { Authenticator } from "@aws-amplify/ui-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { getCurrentUser, signOut as amplifySignOut } from "aws-amplify/auth";
+import { Hub } from "aws-amplify/utils";
 import HomePage from "./pages/HomePage.jsx";
 import DetailPage from "./pages/DetailPage.jsx";
+import AuthPage from "./pages/AuthPage.jsx";
 import TargetModal from "./components/TargetModal.jsx";
 import Toast from "./components/Toast.jsx";
 import ChatDrawer from "./components/ChatDrawer.jsx";
-import { buildHeatmapFromProblems } from "./lib/date.js";
 import {
   ensureUser, listMyProblems, updateMyDailyTarget, updateProblemTags,
   updateProblemSolutions, deleteProblem
@@ -121,7 +122,6 @@ function AppInner({ user, signOut }) {
   const onBack = () => setRoute({ name: "home" });
 
   const detailProblem = route.name === "detail" ? problems.find((p) => p.id === route.id) : null;
-  const heatmap = buildHeatmapFromProblems(problems);
 
   if (loading) return <div className="empty-state" style={{ marginTop: 80 }}>Loading…</div>;
 
@@ -132,7 +132,6 @@ function AppInner({ user, signOut }) {
           <HomePage
             problems={problems}
             pending={0}
-            heatmap={heatmap}
             target={dailyTarget}
             theme={theme}
             user={user}
@@ -167,9 +166,35 @@ function AppInner({ user, signOut }) {
 }
 
 export default function App() {
-  return (
-    <Authenticator>
-      {({ signOut, user }) => <AppInner user={user} signOut={signOut} />}
-    </Authenticator>
-  );
+  // null = still checking; false = unauthenticated; object = signed-in user
+  const [user, setUser] = useState(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const u = await getCurrentUser();
+      setUser(u);
+    } catch {
+      setUser(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // React to OAuth redirect callbacks and sign-out events without a manual reload.
+  useEffect(() => {
+    const stop = Hub.listen("auth", ({ payload }) => {
+      if (payload.event === "signedIn" || payload.event === "signInWithRedirect") refresh();
+      if (payload.event === "signedOut") setUser(false);
+    });
+    return () => stop();
+  }, [refresh]);
+
+  const signOut = async () => {
+    try { await amplifySignOut(); } catch { /* still treat as signed-out locally */ }
+    setUser(false);
+  };
+
+  if (user === null) return <div className="empty-state" style={{ marginTop: 80 }}>Loading…</div>;
+  if (user === false) return <AuthPage onSignedIn={refresh} />;
+  return <AppInner user={user} signOut={signOut} />;
 }

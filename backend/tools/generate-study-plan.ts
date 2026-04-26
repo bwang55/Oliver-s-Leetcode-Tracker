@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import type { ToolContext, ToolDefinition } from "./_types.js";
 import { analyzeProfile } from "./analyze-profile.js";
+// Inline the bank as an ESM JSON import so esbuild bundles it into the Lambda
+// artifact. (Reading from disk via fs.readFileSync fails in Lambda because
+// `defineFunction` only ships the bundled JS, not adjacent data files.)
+import bankData from "./data/problem-bank.json";
 
 interface BankEntry {
   number: number;
@@ -16,15 +17,7 @@ interface BankEntry {
   prerequisiteTags: string[];
 }
 
-let _bank: BankEntry[] | null = null;
-function loadBank(): BankEntry[] {
-  if (_bank) return _bank;
-  const here = dirname(fileURLToPath(import.meta.url));
-  _bank = JSON.parse(
-    readFileSync(join(here, "data", "problem-bank.json"), "utf-8")
-  ) as BankEntry[];
-  return _bank;
-}
+const bank: BankEntry[] = bankData as BankEntry[];
 
 export const GenerateStudyPlanInput = z.object({
   days: z.number().int().min(1).max(30),
@@ -55,7 +48,6 @@ export async function generateStudyPlan(
   input: GenerateStudyPlanInput
 ): Promise<GenerateStudyPlanOutput> {
   const { days, focus } = GenerateStudyPlanInput.parse(input);
-  const bank = loadBank();
 
   // Step 1: analyze user's profile to inform the focus tag.
   const profile = await analyzeProfile(ctx, { window: "month" });

@@ -11,6 +11,19 @@ import ToolCallCard from "./ToolCallCard.jsx";
 //   { kind: "user",      content }
 //   { kind: "assistant", content }   ← accumulates streaming text deltas
 //   { kind: "tool",      id, tool, args, result?, error?, durationMs? }
+const WIDTH_KEY = "lc-tracker:chat-width";
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 900;
+const DEFAULT_WIDTH = 420;
+
+function loadStoredWidth() {
+  try {
+    const v = parseInt(localStorage.getItem(WIDTH_KEY), 10);
+    if (Number.isFinite(v) && v >= MIN_WIDTH && v <= MAX_WIDTH) return v;
+  } catch {}
+  return DEFAULT_WIDTH;
+}
+
 function ChatDrawer({ pendingMessage, onSessionUpdated }) {
   const [events, setEvents] = useState([]);
   const [input, setInput] = useState("");
@@ -21,8 +34,40 @@ function ChatDrawer({ pendingMessage, onSessionUpdated }) {
   // when expanded, and collapses to a floating button. Desktop: always docked.
   const [isMobile, setIsMobile] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(loadStoredWidth);
+  const [resizing, setResizing] = useState(false);
   const bodyRef = useRef(null);
   const lastSentTsRef = useRef(null);
+
+  // Drag-to-resize on the left edge. Only active on desktop; the overlay path
+  // ignores `width` entirely.
+  const onResizeStart = (e) => {
+    e.preventDefault();
+    setResizing(true);
+    const startX = e.clientX;
+    const startWidth = width;
+    const move = (ev) => {
+      // Panel is right-docked, so dragging LEFT (negative deltaX) grows it.
+      const delta = startX - ev.clientX;
+      const cap = Math.min(MAX_WIDTH, window.innerWidth - 360);
+      const next = Math.max(MIN_WIDTH, Math.min(cap, startWidth + delta));
+      setWidth(next);
+    };
+    const up = () => {
+      setResizing(false);
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      try { localStorage.setItem(WIDTH_KEY, String(width)); } catch {}
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+
+  // Persist width whenever it settles (resize ends or value changes from drag).
+  useEffect(() => {
+    if (resizing) return;
+    try { localStorage.setItem(WIDTH_KEY, String(width)); } catch {}
+  }, [width, resizing]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 900px)");
@@ -149,8 +194,21 @@ function ChatDrawer({ pendingMessage, onSessionUpdated }) {
     );
   }
 
+  const panelStyle = isMobile ? undefined : { width, flexBasis: width };
+
   return (
-    <aside className={`chat-panel ${isMobile ? "chat-panel-overlay" : ""}`}>
+    <aside
+      className={`chat-panel ${isMobile ? "chat-panel-overlay" : ""} ${resizing ? "chat-panel-resizing" : ""}`}
+      style={panelStyle}
+    >
+      {!isMobile && (
+        <div
+          className="chat-panel-resizer"
+          onMouseDown={onResizeStart}
+          aria-label="Resize assistant panel"
+          title="Drag to resize"
+        />
+      )}
       <div className="chat-panel-head">
         <h3>Assistant {route && <span className="chat-panel-route">· {route}</span>}</h3>
         <div className="chat-panel-head-actions">

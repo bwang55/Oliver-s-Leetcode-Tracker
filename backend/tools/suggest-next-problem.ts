@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import type { ToolContext, ToolDefinition } from "./_types.js";
+// Inline the bank as an ESM JSON import so esbuild bundles it into the Lambda
+// artifact. (Reading from disk via fs.readFileSync fails in Lambda because
+// `defineFunction` only ships the bundled JS, not adjacent data files.)
+import bankData from "./data/problem-bank.json";
 
 interface BankEntry {
   number: number;
@@ -15,16 +16,7 @@ interface BankEntry {
   prerequisiteTags: string[];
 }
 
-// Load bank lazily so tests / module-cache resets work cleanly.
-let _bank: BankEntry[] | null = null;
-function loadBank(): BankEntry[] {
-  if (_bank) return _bank;
-  const here = dirname(fileURLToPath(import.meta.url));
-  _bank = JSON.parse(
-    readFileSync(join(here, "data", "problem-bank.json"), "utf-8")
-  ) as BankEntry[];
-  return _bank;
-}
+const bank: BankEntry[] = bankData as BankEntry[];
 
 export const SuggestNextProblemInput = z.object({
   focus: z.string().optional()
@@ -48,7 +40,6 @@ export async function suggestNextProblem(
   input: SuggestNextProblemInput
 ): Promise<SuggestNextProblemOutput> {
   const { focus } = SuggestNextProblemInput.parse(input);
-  const bank = loadBank();
 
   // Page-scan all of the user's solved problems via the byUserAndDate GSI.
   const solvedNumbers = new Set<number>();
