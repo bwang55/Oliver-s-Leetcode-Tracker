@@ -24,7 +24,7 @@ function groupByDay(problems) {
 
 function HomePage(props) {
   const {
-    problems, pending, target, theme,
+    problems, pending, target, theme, user,
     onAdjustTarget, onComposerSubmit, onOpenProblem, onToggleTheme, showToast,
     onSignOut
   } = props;
@@ -51,6 +51,7 @@ function HomePage(props) {
     <div className="app">
       <Topbar
         theme={theme}
+        user={user}
         onToggleTheme={onToggleTheme}
         onSearch={() => showToast("Search coming soon")}
         onSignOut={onSignOut || (() => showToast("Signed out (mock)"))}
