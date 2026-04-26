@@ -105,7 +105,16 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
   const solutionsObj: Record<string, string> = { python: "", cpp: "", java: "" };
   solutionsObj[lang] = solutionText;
   const now = new Date().toISOString();
-  const item = {
+
+  // Two shapes here on purpose:
+  //   `ddbItem.solutions` = JSON STRING (the schema declares `a.json()` =
+  //                         AWSJSON which AppSync expects on disk as a string;
+  //                         storing a Map breaks the resolver and the frontend
+  //                         then sees `solutions: null`).
+  //   `returnItem.solutions` = OBJECT (the agent / caller wants to consume it
+  //                            as a plain object, and ProblemSchema validates
+  //                            it as `z.record(z.string()).nullable()`).
+  const baseItem = {
     id, userId: ctx.userId,
     number: extraction.number,
     title: extraction.title,
@@ -114,22 +123,19 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
     solvedAt: now,
     description: extraction.description,
     constraints: extraction.constraints,
-    // schema declares `solutions: a.json()` which is AWSJSON — a JSON string on
-    // the wire. If we put a DDB Map here AppSync can't serialize it back through
-    // the model resolver and the frontend sees null. Stringify so the AWSJSON
-    // resolver round-trips correctly.
-    solutions: JSON.stringify(solutionsObj),
     note: "",
     createdAt: now,
     updatedAt: now,
     __typename: "Problem",
     owner: ctx.userId
   };
+  const ddbItem = { ...baseItem, solutions: JSON.stringify(solutionsObj) };
+  const returnItem = { ...baseItem, solutions: solutionsObj };
 
   try {
     await ctx.ddb.send(new PutCommand({
       TableName: ctx.env.PROBLEM_TABLE,
-      Item: item,
+      Item: ddbItem,
       ConditionExpression: "attribute_not_exists(id)"
     }));
   } catch {
@@ -144,7 +150,7 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
     ContentType: "application/json"
   })).catch((e) => console.error("ai-log put failed", e));
 
-  return ProblemSchema.parse(item);
+  return ProblemSchema.parse(returnItem);
 }
 
 export const addProblemTool: ToolDefinition<AddProblemInput, ReturnType<typeof addProblem> extends Promise<infer R> ? R : never> = {
