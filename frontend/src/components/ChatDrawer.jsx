@@ -2,22 +2,26 @@ import React, { useState, useRef, useEffect } from "react";
 import { streamChat } from "../lib/chat.js";
 import ToolCallCard from "./ToolCallCard.jsx";
 
-function ChatDrawer({ open, onClose, initialMessage, onSessionUpdated }) {
-  const [messages, setMessages] = useState([]); // {role, content, toolCalls?}
-  const [pendingTools, setPendingTools] = useState([]); // active tool cards
+// Always-docked chat panel. Lives in the right column of `.layout-shell`.
+// `pendingMessage` is `{text, ts}` (or null) — the parent bumps `ts` each time
+// it wants the chat to send something on its behalf (e.g. composer paste).
+function ChatDrawer({ pendingMessage, onSessionUpdated }) {
+  const [messages, setMessages] = useState([]);
+  const [pendingTools, setPendingTools] = useState([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [route, setRoute] = useState(null);
   const bodyRef = useRef(null);
+  const lastSentTsRef = useRef(null);
 
   useEffect(() => {
-    if (open && initialMessage && !streaming) {
-      setInput(initialMessage);
-      send(initialMessage);
-    }
+    if (!pendingMessage || streaming) return;
+    if (pendingMessage.ts === lastSentTsRef.current) return;
+    lastSentTsRef.current = pendingMessage.ts;
+    send(pendingMessage.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialMessage]);
+  }, [pendingMessage]);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -27,13 +31,9 @@ function ChatDrawer({ open, onClose, initialMessage, onSessionUpdated }) {
     if (!text.trim() || streaming) return;
     setStreaming(true);
     setRoute(null);
-
-    // Append user message
-    const userMsg = { role: "user", content: text };
-    setMessages((m) => [...m, userMsg]);
+    setMessages((m) => [...m, { role: "user", content: text }]);
     setInput("");
 
-    // Stream
     let assistantContent = "";
     try {
       for await (const ev of streamChat({ message: text, sessionId })) {
@@ -69,7 +69,6 @@ function ChatDrawer({ open, onClose, initialMessage, onSessionUpdated }) {
           setMessages((m) => [...m, { role: "assistant", content: "⚠ " + (ev.data.message || "Backend error") }]);
         }
         if (ev.type === "session_save_failed") {
-          // Non-fatal — the user already saw the assistant's reply, just log.
           console.warn("session save failed:", ev.data.error);
         }
       }
@@ -87,44 +86,58 @@ function ChatDrawer({ open, onClose, initialMessage, onSessionUpdated }) {
     }
   };
 
-  if (!open) return null;
+  const clearChat = () => {
+    if (streaming) return;
+    setMessages([]);
+    setPendingTools([]);
+    setSessionId(null);
+    setRoute(null);
+    setInput("");
+  };
+
   return (
-    <div className="chat-drawer-backdrop" onClick={onClose}>
-      <div className="chat-drawer" onClick={(e) => e.stopPropagation()}>
-        <div className="chat-drawer-head">
-          <h3>Assistant {route && <span className="chat-drawer-route">· {route}</span>}</h3>
-          <button className="chat-drawer-close" onClick={onClose} aria-label="Close">×</button>
-        </div>
-        <div className="chat-drawer-body" ref={bodyRef}>
-          {messages.length === 0 && (
-            <div className="chat-drawer-empty">
-              Try: <em>"I just did Two Sum"</em> · <em>"Analyze my weak spots"</em> · <em>"Plan me 5 days on graphs"</em>
-            </div>
-          )}
-          {messages.map((m, i) => (
-            <div key={i} className={`chat-msg chat-msg-${m.role}`}>
-              {m.content}
-            </div>
-          ))}
-          {pendingTools.map((tc) => (
-            <ToolCallCard key={tc.id} {...tc} />
-          ))}
-          {streaming && <div className="chat-drawer-streaming">…thinking</div>}
-        </div>
-        <div className="chat-drawer-foot">
-          <textarea
-            placeholder="Type a message… ⌘↵ to send"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKey}
-            disabled={streaming}
-          />
-          <button className="btn btn-primary" onClick={() => send(input)} disabled={streaming || !input.trim()}>
-            Send
-          </button>
-        </div>
+    <aside className="chat-panel">
+      <div className="chat-panel-head">
+        <h3>Assistant {route && <span className="chat-panel-route">· {route}</span>}</h3>
+        <button
+          className="chat-panel-clear"
+          onClick={clearChat}
+          disabled={streaming || messages.length === 0}
+          aria-label="New conversation"
+          title="New conversation"
+        >
+          New
+        </button>
       </div>
-    </div>
+      <div className="chat-panel-body" ref={bodyRef}>
+        {messages.length === 0 && (
+          <div className="chat-panel-empty">
+            Try: <em>"I just did Two Sum"</em> · <em>"Analyze my weak spots"</em> · <em>"Plan me 5 days on graphs"</em>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className={`chat-msg chat-msg-${m.role}`}>
+            {m.content}
+          </div>
+        ))}
+        {pendingTools.map((tc) => (
+          <ToolCallCard key={tc.id} {...tc} />
+        ))}
+        {streaming && <div className="chat-panel-streaming">…thinking</div>}
+      </div>
+      <div className="chat-panel-foot">
+        <textarea
+          placeholder="Type a message… ⌘↵ to send"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKey}
+          disabled={streaming}
+        />
+        <button className="btn btn-primary" onClick={() => send(input)} disabled={streaming || !input.trim()}>
+          Send
+        </button>
+      </div>
+    </aside>
   );
 }
 

@@ -24,8 +24,9 @@ function AppInner({ user, signOut }) {
   const [route, setRoute] = useState({ name: "home" });
   const [toast, setToast] = useState(null);
   const [showTarget, setShowTarget] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [pendingChatMessage, setPendingChatMessage] = useState(null);
+  // Always-docked chat panel: pendingChat is `{text, ts}` so the same text
+  // resubmitted re-fires the chat's effect (ts changes each time).
+  const [pendingChat, setPendingChat] = useState(null);
 
   const cached = loadCachedPrefs();
   const [theme, setTheme] = useState(cached.theme || "light");
@@ -64,8 +65,7 @@ function AppInner({ user, signOut }) {
     // Prepend a hint so the orchestrator's intent classifier doesn't get confused by
     // a raw code dump and route to Analyst (which would just write a code review).
     const framed = `I just solved this Leetcode problem. Please add it to my tracker.\n\n\`\`\`\n${text}\n\`\`\``;
-    setPendingChatMessage(framed);
-    setChatOpen(true);
+    setPendingChat({ text: framed, ts: Date.now() });
   };
 
   const onChatSessionUpdated = async () => {
@@ -100,38 +100,37 @@ function AppInner({ user, signOut }) {
   if (loading) return <div className="empty-state" style={{ marginTop: 80 }}>Loading…</div>;
 
   return (
-    <>
-      {route.name === "home" && (
-        <HomePage
-          problems={problems}
-          pending={0}
-          heatmap={heatmap}
-          target={dailyTarget}
-          theme={theme}
-          user={user}
-          onSignOut={signOut}
-          onOpenChat={() => { setPendingChatMessage(null); setChatOpen(true); }}
-          onToggleTheme={onToggleTheme}
-          onAdjustTarget={() => setShowTarget(true)}
-          onComposerSubmit={onComposerSubmit}
-          onOpenProblem={onOpenProblem}
-          showToast={showToast}
-        />
-      )}
-      {route.name === "detail" && detailProblem && (
-        <DetailPage problem={detailProblem} onBack={onBack} onUpdate={onUpdateProblem} />
-      )}
+    <div className="layout-shell">
+      <div className="layout-main">
+        {route.name === "home" && (
+          <HomePage
+            problems={problems}
+            pending={0}
+            heatmap={heatmap}
+            target={dailyTarget}
+            theme={theme}
+            user={user}
+            onSignOut={signOut}
+            onToggleTheme={onToggleTheme}
+            onAdjustTarget={() => setShowTarget(true)}
+            onComposerSubmit={onComposerSubmit}
+            onOpenProblem={onOpenProblem}
+            showToast={showToast}
+          />
+        )}
+        {route.name === "detail" && detailProblem && (
+          <DetailPage problem={detailProblem} onBack={onBack} onUpdate={onUpdateProblem} />
+        )}
+      </div>
+      <ChatDrawer
+        pendingMessage={pendingChat}
+        onSessionUpdated={onChatSessionUpdated}
+      />
       {showTarget && (
         <TargetModal value={dailyTarget} onSave={onSaveTarget} onCancel={() => setShowTarget(false)} />
       )}
-      <ChatDrawer
-        open={chatOpen}
-        onClose={() => { setChatOpen(false); setPendingChatMessage(null); }}
-        initialMessage={pendingChatMessage}
-        onSessionUpdated={onChatSessionUpdated}
-      />
       {toast && <Toast key={toast.key} message={toast.msg} onDone={() => setToast(null)} />}
-    </>
+    </div>
   );
 }
 

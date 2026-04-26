@@ -26,7 +26,7 @@ function HomePage(props) {
   const {
     problems, pending, heatmap, target, theme,
     onAdjustTarget, onComposerSubmit, onOpenProblem, onToggleTheme, showToast,
-    onOpenChat, onSignOut
+    onSignOut
   } = props;
 
   const groups = useMemo(() => groupByDay(problems), [problems]);
@@ -52,7 +52,6 @@ function HomePage(props) {
       <Topbar
         theme={theme}
         onToggleTheme={onToggleTheme}
-        onOpenChat={onOpenChat}
         onSearch={() => showToast("Search coming soon")}
         onSignOut={onSignOut || (() => showToast("Signed out (mock)"))}
       />

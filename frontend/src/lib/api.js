@@ -67,14 +67,7 @@ export async function listMyProblems() {
     ]
   });
   if (out.errors?.length) throw new Error(out.errors[0].message);
-  const raw = out.data || [];
-  if (raw.length > 0) {
-    const sample = raw[0];
-    console.log("[listMyProblems] keys:", Object.keys(sample),
-      "| solutions type:", typeof sample.solutions,
-      "| solutions value:", sample.solutions);
-  }
-  const items = raw.map(normalizeProblem);
+  const items = (out.data || []).map(normalizeProblem);
   return items.sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt));
 }
 
