@@ -12,6 +12,7 @@ import { exportsBucket, aiLogsBucket } from "./storage/resource.js";
 import { exportData } from "./functions/export-data/resource.js";
 import { postConfirmation } from "./auth/post-confirmation/resource.js";
 import { mcpServer } from "./functions/mcp-server/resource.js";
+import { chatStream } from "./functions/chat-stream/resource.js";
 
 export const backend = defineBackend({
   auth,
@@ -20,7 +21,8 @@ export const backend = defineBackend({
   aiLogsBucket,
   exportData,
   postConfirmation,
-  mcpServer
+  mcpServer,
+  chatStream
 });
 
 // Cross-resource wiring: postConfirmation Lambda needs to write to the User table.
@@ -126,3 +128,39 @@ backend.auth.resources.userPool.addDomain("CognitoDomain", {
   cognitoDomain: { domainPrefix: cognitoDomainPrefix }
 });
 backend.mcpServer.addEnvironment("COGNITO_DOMAIN", cognitoDomainPrefix);
+
+// ---------------------------------------------------------------------------
+// Phase 6: chat-stream Lambda (orchestrator entry point for the PWA chat drawer)
+// ---------------------------------------------------------------------------
+
+const chatLambda = backend.chatStream.resources.lambda;
+backend.data.resources.tables["Problem"].grantReadWriteData(chatLambda);
+backend.data.resources.tables["RateLimit"].grantReadWriteData(chatLambda);
+backend.data.resources.tables["User"].grantReadData(chatLambda);
+backend.data.resources.tables["ChatSession"].grantReadWriteData(chatLambda);
+backend.aiLogsBucket.resources.bucket.grantWrite(chatLambda);
+
+backend.chatStream.addEnvironment("PROBLEM_TABLE", backend.data.resources.tables["Problem"].tableName);
+backend.chatStream.addEnvironment("USER_TABLE", backend.data.resources.tables["User"].tableName);
+backend.chatStream.addEnvironment("RATELIMIT_TABLE", backend.data.resources.tables["RateLimit"].tableName);
+backend.chatStream.addEnvironment("CHATSESSION_TABLE", backend.data.resources.tables["ChatSession"].tableName);
+backend.chatStream.addEnvironment("AI_LOGS_BUCKET", backend.aiLogsBucket.resources.bucket.bucketName);
+backend.chatStream.addEnvironment("EXPORTS_BUCKET", backend.exportsBucket.resources.bucket.bucketName);
+backend.chatStream.addEnvironment("COGNITO_USER_POOL_ID", backend.auth.resources.userPool.userPoolId);
+backend.chatStream.addEnvironment(
+  "COGNITO_REGION",
+  Stack.of(backend.auth.resources.userPool).region
+);
+
+// Function URL with response streaming. JWT auth is verified in-handler.
+const chatFnUrl = chatLambda.addFunctionUrl({
+  authType: FunctionUrlAuthType.NONE,
+  invokeMode: InvokeMode.RESPONSE_STREAM,
+  cors: {
+    allowedOrigins: ["*"],
+    allowedMethods: [HttpMethod.POST, HttpMethod.GET],
+    allowedHeaders: ["authorization", "content-type"]
+  }
+});
+
+backend.addOutput({ custom: { chatStreamUrl: chatFnUrl.url } });
