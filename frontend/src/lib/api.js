@@ -2,11 +2,16 @@ import { generateClient } from "aws-amplify/data";
 
 export const client = generateClient({ authMode: "userPool" });
 
-// Lazy-create the User row on first call (replaces the broken postConfirmation trigger).
-// Idempotent — subsequent calls find an existing row.
+// Lazy-create the User row on first call (replaces the postConfirmation trigger).
+// Resilient to a row that exists at this userId but isn't visible to the current
+// caller (e.g. a postConfirmation-Lambda-written row without an owner field — the
+// AppSync owner-filter then returns null on `get`, but `create` still fails its
+// `attribute_not_exists(userId)` conditional). We treat that case as "row exists,
+// just couldn't read it" and fall back to defaults so the UI can render.
 export async function ensureUser(userId, email) {
-  const get = await client.models.User.get({ userId });
-  if (get.data) return get.data;
+  const initialGet = await client.models.User.get({ userId });
+  if (initialGet.data) return initialGet.data;
+
   const create = await client.models.User.create({
     userId,
     email,
@@ -14,8 +19,21 @@ export async function ensureUser(userId, email) {
     dailyTarget: 3,
     createdAt: new Date().toISOString()
   });
-  if (create.errors?.length) throw new Error(create.errors[0].message);
-  return create.data;
+  if (create.data) return create.data;
+
+  // Create failed. If it's a conditional / already-exists error, the row is in
+  // DDB but we can't see it. Re-fetch once (in case of read-after-write lag),
+  // then return synthetic defaults rather than blocking the app.
+  const errorMsg = create.errors?.[0]?.message ?? "";
+  const looksLikeExists = /conditional|already exists|attribute_not_exists/i.test(errorMsg);
+  if (looksLikeExists) {
+    const reGet = await client.models.User.get({ userId });
+    if (reGet.data) return reGet.data;
+    console.warn("ensureUser: row exists at userId but unreadable; using defaults", create.errors);
+    return { userId, email, displayName: email, dailyTarget: 3 };
+  }
+
+  throw new Error(errorMsg || "ensureUser: create failed");
 }
 
 export async function listMyProblems() {

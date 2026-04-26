@@ -209,12 +209,14 @@ function decodeBody(event: LambdaUrlEvent): string | undefined {
 }
 
 function writeJson(stream: any, status: number, body: object, extra?: Record<string, string>) {
+  // Note: do NOT set access-control-allow-origin here. Lambda Function URL's
+  // CORS config (in amplify/backend.ts) injects it; setting it manually
+  // produces a duplicate ACAO header that browsers reject.
   const payload = JSON.stringify(body);
   const metadata = {
     statusCode: status,
     headers: {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
       ...(extra ?? {})
     }
   };
@@ -258,8 +260,7 @@ function dispatchToTransport(
   let wrapped: any | undefined;
   let status = 200;
   let respHeaders: Record<string, string> = {
-    "content-type": "application/json",
-    "access-control-allow-origin": "*"
+    "content-type": "application/json"
   };
   const headersWritten = { v: false };
 
@@ -336,16 +337,13 @@ const streamHandler = async (event: LambdaUrlEvent, responseStream: any /*, cont
   const host = event.requestContext?.domainName ?? "localhost";
   const originUrl = new URL(`https://${host}${path}`);
 
-  // CORS preflight
+  // CORS preflight is handled by the Lambda Function URL's CORS config and
+  // never reaches this handler in normal operation. If it does, return 204
+  // with no CORS headers — Lambda Function URL adds its own.
   if (method === "OPTIONS") {
     const wrapped = (globalThis as any).awslambda.HttpResponseStream.from(responseStream, {
       statusCode: 204,
-      headers: {
-        "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET, POST, OPTIONS",
-        "access-control-allow-headers": "authorization, content-type, mcp-session-id",
-        "access-control-max-age": "86400"
-      }
+      headers: {}
     });
     wrapped.end();
     return;
