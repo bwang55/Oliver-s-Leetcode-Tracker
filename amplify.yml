@@ -5,17 +5,19 @@ applications:
       phases:
         preBuild:
           commands:
-            # cwd persists across commands AND across phases in Amplify Hosting CI.
-            # Anchor every command at $CODEBUILD_SRC_DIR (CodeBuild's auto-injected
-            # repo-root env var) so prior phases' cd's don't break us.
+            # Frontend phase starts at repo root in CI (empirical). Cwd persists
+            # from preBuild → build within the same phase, so the `cd frontend`
+            # here means `npm run build` below already runs from frontend/.
             #
             # `npm install` (not `npm ci`) — Amplify CDK packages ship bundled
             # deps that npm ci's strict validator rejects with "Missing:
             # fast-xml-parser@... from lock file". install relaxes that check.
-            - cd $CODEBUILD_SRC_DIR/frontend && npm install
+            - cd frontend && npm install
         build:
           commands:
-            - cd $CODEBUILD_SRC_DIR/frontend && npm run build
+            # cwd is already frontend/ from preBuild — DO NOT `cd frontend` again,
+            # that would attempt frontend/frontend which doesn't exist.
+            - npm run build
       artifacts:
         baseDirectory: frontend/dist
         files:
@@ -27,19 +29,20 @@ applications:
       phases:
         build:
           commands:
-            # The Gen 2 backend (`amplify/`) and its CLI dep
-            # (`@aws-amplify/backend-cli`) live at repo root. Plus we need the
-            # `backend/` package's deps (AWS SDK, openai, jose, @types/node)
-            # for Lambda bundling and the TS validation step inside
-            # `pipeline-deploy`.
+            # Backend phase starts at <repo-root>/frontend/ (because of
+            # appRoot: frontend). `cd ..` to repo root where amplify/ lives.
             #
-            # Anchor at $CODEBUILD_SRC_DIR for the same reason as the frontend
-            # phase: cwd persists, don't trust it.
+            # Three installs needed:
+            #   - root deps    → CDK + Amplify CLI (`ampx` binary)
+            #   - backend/     → AWS SDK / openai / jose / @types — for Lambda
+            #                    bundling and TS validation inside pipeline-deploy
+            #   - amplify/     → tiny resource shim package
             #
-            # All chained with `&&` in one shell so `npx ampx` sees the bins
-            # the just-completed npm install put on PATH.
+            # All chained in one shell so npx ampx sees the bins on PATH.
+            #
+            # `npm install` not `npm ci` — same Amplify-CDK bundled-deps issue.
             #
             # `--outputs-out-dir frontend/src` writes amplify_outputs.json
-            # directly where the frontend imports from (locally this is a
-            # gitignored symlink, but CI doesn't have it).
-            - cd $CODEBUILD_SRC_DIR && npm install && (cd backend && npm install) && (cd amplify && npm install) && npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --outputs-out-dir frontend/src
+            # straight where the frontend imports from (locally a gitignored
+            # symlink, but CI doesn't have it).
+            - cd .. && npm install && (cd backend && npm install) && (cd amplify && npm install) && npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --outputs-out-dir frontend/src
