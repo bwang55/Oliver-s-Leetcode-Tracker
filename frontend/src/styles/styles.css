@@ -432,12 +432,11 @@ textarea {
   grid-template-columns: repeat(16, 1fr);
   grid-template-rows: repeat(7, 1fr);
   gap: 3px;
-  /* The whole grid is 16:7 in cell layout. With both axes sized as 1fr × 1fr
-   * AND the container at this aspect ratio, each cell ends up square — without
-   * the per-cell aspect-ratio fighting the row template at large widths. */
-  aspect-ratio: 16 / 7;
-  width: 100%;
-  align-self: center;
+  /* Fill the card. Cells become whatever rect the 1fr×1fr split gives — the
+   * card itself controls the overall shape, so heatmap shape follows the card,
+   * which is what looks "right" when the card is stretched by hero. */
+  flex: 1;
+  min-height: 84px;
   padding: 4px;
 }
 .heatmap-cell {
@@ -802,12 +801,20 @@ textarea {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
-  background: var(--diff-color, var(--easy));
+  width: 6px;
+  background: var(--diff-color, var(--ink-faint));
+  border-top-left-radius: var(--r-md);
+  border-bottom-left-radius: var(--r-md);
 }
-.tile[data-difficulty="Easy"] { --diff-color: var(--easy); }
-.tile[data-difficulty="Medium"] { --diff-color: var(--medium); }
-.tile[data-difficulty="Hard"] { --diff-color: var(--hard); }
+/* Match both legacy title-case (Easy/Medium/Hard) and the GraphQL schema's
+ * uppercase enum (EASY/MEDIUM/HARD) so tiles created via either path color
+ * the stripe correctly. */
+.tile[data-difficulty="Easy"],
+.tile[data-difficulty="EASY"] { --diff-color: var(--easy); }
+.tile[data-difficulty="Medium"],
+.tile[data-difficulty="MEDIUM"] { --diff-color: var(--medium); }
+.tile[data-difficulty="Hard"],
+.tile[data-difficulty="HARD"] { --diff-color: var(--hard); }
 .tile-head {
   display: flex;
   align-items: baseline;
@@ -1044,6 +1051,12 @@ textarea {
   0% { opacity: 0; transform: translateY(6px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+.detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
 .back-btn {
   display: inline-flex;
   align-items: center;
@@ -1052,8 +1065,28 @@ textarea {
   color: var(--ink-soft);
   padding: 6px 10px;
   border-radius: var(--r-sm);
-  margin-bottom: 32px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
   transition: background 180ms var(--ease-out), color 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+.detail-delete {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: color 180ms var(--ease-out), border-color 180ms var(--ease-out), background 180ms var(--ease-out);
+}
+.detail-delete:hover {
+  color: var(--hard);
+  border-color: var(--hard);
+  background: rgba(158, 87, 87, 0.08);
 }
 .back-btn:hover {
   background: var(--bg-sunken);
@@ -1072,9 +1105,12 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.detail-meta .diff[data-difficulty="Easy"] { color: var(--easy); }
-.detail-meta .diff[data-difficulty="Medium"] { color: var(--medium); }
-.detail-meta .diff[data-difficulty="Hard"] { color: var(--hard); }
+.detail-meta .diff[data-difficulty="Easy"],
+.detail-meta .diff[data-difficulty="EASY"] { color: var(--easy); }
+.detail-meta .diff[data-difficulty="Medium"],
+.detail-meta .diff[data-difficulty="MEDIUM"] { color: var(--medium); }
+.detail-meta .diff[data-difficulty="Hard"],
+.detail-meta .diff[data-difficulty="HARD"] { color: var(--hard); }
 .detail-title {
   font-family: var(--font-display);
   font-size: clamp(36px, 5vw, 52px);
@@ -1233,23 +1269,64 @@ textarea {
   border-radius: 2px 2px 0 0;
   transition: left 360ms var(--ease-spring), width 360ms var(--ease-spring);
 }
-.code-copy {
+.code-actions {
   margin-left: auto;
   margin-right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.code-action {
   font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--ink-faint);
   padding: 6px 10px;
   border-radius: var(--r-sm);
+  border: 0;
+  background: transparent;
   cursor: pointer;
   transition: background 180ms var(--ease-out), color 180ms var(--ease-out);
 }
-.code-copy:hover {
+.code-action:hover {
   background: var(--bg-elev);
   color: var(--ink);
 }
 .code-copy.copied {
   color: var(--accent);
+}
+.code-edit:hover {
+  color: var(--accent);
+}
+.code-cancel:hover {
+  color: var(--ink-soft);
+}
+.code-save {
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
+}
+.code-save:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.code-edit-area {
+  width: 100%;
+  min-height: 240px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+  padding: 20px 22px;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--ink);
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.code-edit-area:focus {
+  background: var(--bg);
 }
 .code-pre {
   font-family: var(--font-mono);

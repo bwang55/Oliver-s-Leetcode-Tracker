@@ -7,7 +7,8 @@ import Toast from "./components/Toast.jsx";
 import ChatDrawer from "./components/ChatDrawer.jsx";
 import { buildHeatmapFromProblems } from "./lib/date.js";
 import {
-  ensureUser, listMyProblems, updateMyDailyTarget, updateProblemTags
+  ensureUser, listMyProblems, updateMyDailyTarget, updateProblemTags,
+  updateProblemSolutions, deleteProblem
 } from "./lib/api.js";
 
 const STORAGE_KEY = "lc-tracker:v1";
@@ -88,6 +89,31 @@ function AppInner({ user, signOut }) {
     try { await updateProblemTags(p.id, p.tags); } catch (e) { console.error(e); }
   };
 
+  const onSaveSolutions = async (id, solutions) => {
+    // Optimistic local update so the UI reflects the edit immediately.
+    setProblems((arr) => arr.map((p) => (p.id === id ? { ...p, solutions } : p)));
+    try {
+      await updateProblemSolutions(id, solutions);
+      showToast("Solution saved");
+    } catch (e) {
+      showToast("Save failed: " + e.message);
+    }
+  };
+
+  const onDeleteProblem = async (id) => {
+    const target = problems.find((p) => p.id === id);
+    const label = target ? `#${target.number} ${target.title}` : "this problem";
+    if (!window.confirm(`Delete ${label}? This can't be undone.`)) return;
+    try {
+      await deleteProblem(id);
+      setProblems((arr) => arr.filter((p) => p.id !== id));
+      setRoute({ name: "home" });
+      showToast(`Deleted ${label}`);
+    } catch (e) {
+      showToast("Delete failed: " + e.message);
+    }
+  };
+
   const onOpenProblem = (id) => {
     setRoute({ name: "detail", id });
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -119,7 +145,13 @@ function AppInner({ user, signOut }) {
           />
         )}
         {route.name === "detail" && detailProblem && (
-          <DetailPage problem={detailProblem} onBack={onBack} onUpdate={onUpdateProblem} />
+          <DetailPage
+            problem={detailProblem}
+            onBack={onBack}
+            onUpdate={onUpdateProblem}
+            onSaveSolutions={onSaveSolutions}
+            onDelete={onDeleteProblem}
+          />
         )}
       </div>
       <ChatDrawer

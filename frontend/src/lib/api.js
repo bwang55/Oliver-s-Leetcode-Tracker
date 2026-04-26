@@ -83,6 +83,19 @@ export async function updateProblemTags(id, tags) {
   return out.data;
 }
 
+export async function updateProblemSolutions(id, solutions) {
+  // Pass as object — amplify-js serializes AWSJSON fields on write.
+  const out = await client.models.Problem.update({ id, solutions });
+  if (out.errors?.length) throw new Error(out.errors[0].message);
+  return out.data;
+}
+
+export async function deleteProblem(id) {
+  const out = await client.models.Problem.delete({ id });
+  if (out.errors?.length) throw new Error(out.errors[0].message);
+  return out.data;
+}
+
 export async function exportMyData() {
   const out = await client.mutations.exportMyData();
   if (out.errors?.length) throw new Error(out.errors[0].message);
