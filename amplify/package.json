@@ -1,0 +1,9 @@
+{
+  "name": "leetcode-tracker-amplify-shim",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@aws-amplify/backend": "^1.5.0",
+    "@aws-amplify/backend-cli": "^1.4.0"
+  }
+}
