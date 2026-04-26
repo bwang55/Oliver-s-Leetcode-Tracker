@@ -36,9 +36,9 @@ export async function ensureUser(userId, email) {
   throw new Error(errorMsg || "ensureUser: create failed");
 }
 
-// `solutions` is an AWSJSON field in the schema. Depending on amplify-js client
-// behavior it may come back as a string or an object — normalize to object so
-// `CodeBlock` can do `solutions[lang]`.
+// `solutions` is an AWSJSON field in the schema. amplify-js v6's behavior on
+// AWSJSON varies — sometimes it returns the raw string, sometimes auto-parses
+// to object. Normalize to object so `CodeBlock` can do `solutions[lang]`.
 function normalizeProblem(p) {
   if (!p) return p;
   let s = p.solutions;
@@ -49,9 +49,26 @@ function normalizeProblem(p) {
 }
 
 export async function listMyProblems() {
-  const out = await client.models.Problem.list({ limit: 1000 });
+  // Explicit selectionSet — some amplify-js versions omit AWSJSON fields by
+  // default in list operations to keep payloads small. Listing every field we
+  // need ensures `solutions` actually comes back.
+  const out = await client.models.Problem.list({
+    limit: 1000,
+    selectionSet: [
+      "id", "userId", "number", "title", "difficulty", "tags",
+      "solvedAt", "description", "constraints", "solutions", "note",
+      "createdAt", "updatedAt"
+    ]
+  });
   if (out.errors?.length) throw new Error(out.errors[0].message);
-  const items = (out.data || []).map(normalizeProblem);
+  const raw = out.data || [];
+  if (raw.length > 0) {
+    const sample = raw[0];
+    console.log("[listMyProblems] keys:", Object.keys(sample),
+      "| solutions type:", typeof sample.solutions,
+      "| solutions value:", sample.solutions);
+  }
+  const items = raw.map(normalizeProblem);
   return items.sort((a, b) => new Date(b.solvedAt) - new Date(a.solvedAt));
 }
 
