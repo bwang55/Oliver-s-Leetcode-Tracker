@@ -16,7 +16,7 @@ export const ListProblemsInput = z.object({
   limit: z.number().int().min(1).max(200).default(50),
   cursor: z.string().optional()
 });
-export type ListProblemsInput = z.infer<typeof ListProblemsInput>;
+export type ListProblemsInput = z.input<typeof ListProblemsInput>;
 
 const ListProblemsOutput = z.object({
   items: z.array(ProblemSchema),
