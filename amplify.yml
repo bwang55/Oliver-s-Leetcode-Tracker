@@ -5,25 +5,23 @@ applications:
       phases:
         preBuild:
           commands:
-            # `appRoot: frontend` pins cwd to frontend/, so paths here are
-            # relative to that — not to the repo root.
+            # In CI, frontend phase cwd is the repo root, NOT appRoot. (The
+            # backend phase's `cd ..` may also be persisting cwd across phases.)
+            # Explicitly cd into frontend/ so npm finds the right package.json.
             #
             # `npm install` (not `npm ci`) — same Amplify-CDK bundled-deps
-            # issue as the backend phase: CI's npm rejects perfectly valid
-            # lockfiles with "Missing: fast-xml-parser@... from lock file".
-            # install relaxes that strict check while still honoring lockfile
-            # versions.
-            - npm install
+            # rejection that hit the backend phase.
+            - cd frontend && npm install
         build:
           commands:
-            - npm run build
+            - cd frontend && npm run build
       artifacts:
-        baseDirectory: dist
+        baseDirectory: frontend/dist
         files:
           - '**/*'
       cache:
         paths:
-          - node_modules/**/*
+          - frontend/node_modules/**/*
     backend:
       phases:
         build:
