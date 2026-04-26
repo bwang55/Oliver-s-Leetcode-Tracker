@@ -5,16 +5,17 @@ applications:
       phases:
         preBuild:
           commands:
-            # In CI, frontend phase cwd is the repo root, NOT appRoot. (The
-            # backend phase's `cd ..` may also be persisting cwd across phases.)
-            # Explicitly cd into frontend/ so npm finds the right package.json.
+            # cwd persists across commands AND across phases in Amplify Hosting CI.
+            # Anchor every command at $CODEBUILD_SRC_DIR (CodeBuild's auto-injected
+            # repo-root env var) so prior phases' cd's don't break us.
             #
-            # `npm install` (not `npm ci`) — same Amplify-CDK bundled-deps
-            # rejection that hit the backend phase.
-            - cd frontend && npm install
+            # `npm install` (not `npm ci`) — Amplify CDK packages ship bundled
+            # deps that npm ci's strict validator rejects with "Missing:
+            # fast-xml-parser@... from lock file". install relaxes that check.
+            - cd $CODEBUILD_SRC_DIR/frontend && npm install
         build:
           commands:
-            - cd frontend && npm run build
+            - cd $CODEBUILD_SRC_DIR/frontend && npm run build
       artifacts:
         baseDirectory: frontend/dist
         files:
@@ -26,30 +27,19 @@ applications:
       phases:
         build:
           commands:
-            # `appRoot: frontend` pins cwd to frontend/ for every phase, but the
-            # Gen 2 backend (`amplify/`) and its CLI dep (`@aws-amplify/backend-cli`)
-            # live at repo root. Two notes:
+            # The Gen 2 backend (`amplify/`) and its CLI dep
+            # (`@aws-amplify/backend-cli`) live at repo root. Plus we need the
+            # `backend/` package's deps (AWS SDK, openai, jose, @types/node)
+            # for Lambda bundling and the TS validation step inside
+            # `pipeline-deploy`.
             #
-            # 1. Keep install + ampx invocation in a SINGLE command. Amplify
-            #    Hosting runs each list item as a fresh shell, and `npx ampx`
-            #    sometimes fails to see the freshly-installed bin from a prior
-            #    shell. Chaining with `&&` is the simplest way to guarantee the
-            #    same shell sees both the install and the bin.
+            # Anchor at $CODEBUILD_SRC_DIR for the same reason as the frontend
+            # phase: cwd persists, don't trust it.
             #
-            # 2. `npm install` (not `npm ci`) — Amplify CDK packages ship bundled
-            #    deps that npm ci's strict validator rejects ("Missing:
-            #    fast-xml-parser@... from lock file") even after a clean
-            #    regenerate. install relaxes that check while still honoring the
-            #    lockfile's pinned versions.
+            # All chained with `&&` in one shell so `npx ampx` sees the bins
+            # the just-completed npm install put on PATH.
             #
-            # `--outputs-out-dir frontend/src` writes `amplify_outputs.json`
-            # straight into the path the frontend imports from (locally this is
-            # a gitignored symlink to project root; CI doesn't have that
-            # symlink, so we point ampx there directly).
-            # Three installs in one shell:
-            #   - root deps    → CDK / Amplify CLI for `ampx`
-            #   - backend deps → AWS SDK / openai / jose / @types — needed at
-            #                    bundle time AND for the TS validation step
-            #                    that runs inside `pipeline-deploy`
-            #   - amplify deps → the resource shim package (small)
-            - cd .. && npm install && (cd backend && npm install) && (cd amplify && npm install) && npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --outputs-out-dir frontend/src
+            # `--outputs-out-dir frontend/src` writes amplify_outputs.json
+            # directly where the frontend imports from (locally this is a
+            # gitignored symlink, but CI doesn't have it).
+            - cd $CODEBUILD_SRC_DIR && npm install && (cd backend && npm install) && (cd amplify && npm install) && npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --outputs-out-dir frontend/src
