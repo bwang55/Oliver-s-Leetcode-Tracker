@@ -1,4 +1,5 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
+import { exportData } from "../functions/export-data/resource.js";
 
 const schema = a.schema({
   Difficulty: a.enum(["EASY", "MEDIUM", "HARD"]),
@@ -54,7 +55,19 @@ const schema = a.schema({
     })
     .identifier(["id"])
     .secondaryIndexes((idx) => [idx("userId").sortKeys(["updatedAt"]).name("byUserAndUpdated")])
-    .authorization((allow) => [allow.ownerDefinedIn("userId")])
+    .authorization((allow) => [allow.ownerDefinedIn("userId")]),
+
+  ExportLink: a.customType({
+    url: a.url().required(),
+    expiresAt: a.datetime().required()
+  }),
+
+  exportMyData: a
+    .mutation()
+    .arguments({})
+    .returns(a.ref("ExportLink"))
+    .handler(a.handler.function(exportData))
+    .authorization((allow) => [allow.authenticated()])
 });
 
 export type Schema = ClientSchema<typeof schema>;

@@ -1,0 +1,13 @@
+{
+  "name": "leetcode-tracker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sandbox": "ampx sandbox"
+  },
+  "dependencies": {
+    "@aws-amplify/backend": "^1.5.0",
+    "@aws-amplify/backend-cli": "^1.4.0",
+    "aws-cdk-lib": "^2.158.0"
+  }
+}
