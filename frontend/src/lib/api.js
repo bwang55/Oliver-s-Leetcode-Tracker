@@ -42,20 +42,15 @@ export async function ensureUser(userId, email) {
 function normalizeProblem(p) {
   if (!p) return p;
   let s = p.solutions;
-  const beforeType = typeof s;
-  if (typeof s === "string") {
-    try { s = JSON.parse(s); } catch { s = null; }
+  // Older rows wrote DDB strings, so AppSync double-encoded the AWSJSON: parse
+  // up to two times until we have an object (or give up).
+  for (let i = 0; i < 2 && typeof s === "string"; i++) {
+    try { s = JSON.parse(s); } catch { s = null; break; }
   }
-  // Build a plain shallow copy. Spread on amplify-js Data records can interact
-  // weirdly with proxies, so do an explicit field copy and force `solutions` to
-  // the parsed value last.
+  if (typeof s !== "object" || s === null) s = null;
   const out = {};
   for (const k of Object.keys(p)) out[k] = p[k];
   out.solutions = s;
-  console.log("[normalizeProblem]", p.number, p.title,
-    "before:", beforeType,
-    "after:", typeof s,
-    "outSolutionsType:", typeof out.solutions);
   return out;
 }
 
