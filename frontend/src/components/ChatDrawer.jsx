@@ -24,7 +24,7 @@ function loadStoredWidth() {
   return DEFAULT_WIDTH;
 }
 
-function ChatDrawer({ pendingMessage, onSessionUpdated }) {
+function ChatDrawer({ pendingMessage, onSessionUpdated, currentProblem }) {
   const [events, setEvents] = useState([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -107,8 +107,18 @@ function ChatDrawer({ pendingMessage, onSessionUpdated }) {
     // whenever a tool card lands so subsequent thinking goes into a NEW bubble.
     let appendingToAssistant = false;
 
+    // Snapshot the page context at send-time so a mid-stream navigation
+    // doesn't reach into the wrong problem.
+    const pageContext = currentProblem
+      ? {
+          problemId: currentProblem.id,
+          problemNumber: currentProblem.number,
+          problemTitle: currentProblem.title
+        }
+      : undefined;
+
     try {
-      for await (const ev of streamChat({ message: text, sessionId })) {
+      for await (const ev of streamChat({ message: text, sessionId, pageContext })) {
         if (ev.type === "session") setSessionId(ev.data.sessionId);
         if (ev.type === "route") setRoute(ev.data.route);
 
@@ -233,10 +243,26 @@ function ChatDrawer({ pendingMessage, onSessionUpdated }) {
           )}
         </div>
       </div>
+      {currentProblem && (
+        <div className="chat-context-chip" title="The assistant can see this problem">
+          <span className="chat-context-icon">📍</span>
+          <span className="chat-context-text">
+            #{currentProblem.number} {currentProblem.title}
+          </span>
+        </div>
+      )}
       <div className="chat-panel-body" ref={bodyRef}>
         {events.length === 0 && (
           <div className="chat-panel-empty">
-            Try: <em>"I just did Two Sum"</em> · <em>"Analyze my weak spots"</em> · <em>"Plan me 5 days on graphs"</em>
+            {currentProblem ? (
+              <>
+                Try: <em>"explain this problem"</em> · <em>"add comments to my python"</em>
+              </>
+            ) : (
+              <>
+                Try: <em>"I just did Two Sum"</em> · <em>"Analyze my weak spots"</em> · <em>"Plan me 5 days on graphs"</em>
+              </>
+            )}
           </div>
         )}
         {events.map((e, i) => {

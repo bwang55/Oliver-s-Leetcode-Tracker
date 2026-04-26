@@ -156,6 +156,7 @@ function AppInner({ user, signOut }) {
       <ChatDrawer
         pendingMessage={pendingChat}
         onSessionUpdated={onChatSessionUpdated}
+        currentProblem={detailProblem}
       />
       {showTarget && (
         <TargetModal value={dailyTarget} onSave={onSaveTarget} onCancel={() => setShowTarget(false)} />

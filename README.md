@@ -5,8 +5,14 @@
 
   <p>
     <strong>Paste a solution. Get a tracked, tagged tile.</strong><br/>
-    LLM-extracted Leetcode tracker with a three-agent chat assistant —
+    LLM-extracted Leetcode tracker with a four-agent chat assistant —
     also exposed as a public MCP server so Claude Desktop can drive it.
+  </p>
+
+  <p>
+    <a href="https://main.d2ud5c7vtuyvhq.amplifyapp.com/">
+      <img alt="Live Demo" src="https://img.shields.io/badge/Live%20Demo-Open-C96442?style=for-the-badge&logo=react&logoColor=white"/>
+    </a>
   </p>
 
   <p>
@@ -23,21 +29,22 @@
 ## What it does
 
 - **Paste-to-track.** Drop solution code into the composer; one OpenAI call extracts number, title, difficulty, tags, and description. A tile lands on the heatmap.
-- **Three agents, one chat.** Curator adds/edits problems, Analyst reads your stats, Planner suggests what's next. An intent classifier routes each message in one cheap call.
-- **Same nine tools, two transports.** The PWA's chat drawer calls them in-process; Claude Desktop calls them over OAuth-protected MCP. No fork.
+- **Four agents, one chat.** Curator adds/edits problems, Analyst reads your stats, Planner suggests what's next, Tutor explains problems and annotates your code. An intent classifier routes each message in one cheap call.
+- **Same eleven tools, two transports.** The PWA's chat drawer calls them in-process; Claude Desktop calls them over OAuth-protected MCP. No fork.
+- **Page-aware assistant.** When you're viewing a problem, the chat drawer knows which one — ask "explain this" or "add comments to my python" without naming it.
 - **Installable PWA** with auto-fitting heatmap, dark mode, and a resizable docked chat panel.
 
 ## How it's built
 
 ```
 PWA  ──►  AppSync (CRUD)
-  │       chat-stream Lambda  ──►  Curator | Analyst | Planner
-  │                                   └─ tools/*.ts (9 tools)  ──►  DynamoDB / OpenAI
+  │       chat-stream Lambda  ──►  Curator | Analyst | Planner | Tutor
+  │                                   └─ tools/*.ts (11 tools)  ──►  DynamoDB / OpenAI
   │
-  └──  external MCP clients  ──►  mcp-server Lambda (OAuth 2.1, same 9 tools)
+  └──  external MCP clients  ──►  mcp-server Lambda (OAuth 2.1, same 11 tools)
 ```
 
-React + Vite PWA on top of Amplify Gen 2 (Cognito, AppSync, DynamoDB, S3, Lambda). Agents run on OpenAI function-calling with a `runAgent` loop bounded by a 10-call cap and 30s timeout. The MCP server speaks Streamable HTTP via `@modelcontextprotocol/sdk` with a Cognito DCR shim. 57 vitest unit tests over the tool layer.
+React + Vite PWA on top of Amplify Gen 2 (Cognito, AppSync, DynamoDB, S3, Lambda). Agents run on OpenAI function-calling with a `runAgent` loop bounded by a 10-call cap and 30s timeout. The MCP server speaks Streamable HTTP via `@modelcontextprotocol/sdk` with a Cognito DCR shim. 67 vitest unit tests over the tool layer.
 
 ## Run locally
 

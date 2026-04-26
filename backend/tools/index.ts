@@ -8,6 +8,8 @@ import { analyzeProfileTool } from "./analyze-profile.js";
 import { suggestNextProblemTool } from "./suggest-next-problem.js";
 import { generateStudyPlanTool } from "./generate-study-plan.js";
 import { dailySummaryTool } from "./daily-summary.js";
+import { explainProblemTool } from "./explain-problem.js";
+import { addCommentsToCodeTool } from "./add-comments-to-code.js";
 import type { ToolDefinition } from "./_types.js";
 
 export const ALL_TOOLS: Record<string, ToolDefinition<any, any>> = {
@@ -20,7 +22,9 @@ export const ALL_TOOLS: Record<string, ToolDefinition<any, any>> = {
   analyze_profile: analyzeProfileTool,
   suggest_next_problem: suggestNextProblemTool,
   generate_study_plan: generateStudyPlanTool,
-  daily_summary: dailySummaryTool
+  daily_summary: dailySummaryTool,
+  explain_problem: explainProblemTool,
+  add_comments_to_code: addCommentsToCodeTool
 };
 
 // OpenAI SDK-compatible tools array (function calling shape)

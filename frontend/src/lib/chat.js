@@ -6,7 +6,7 @@ if (!CHAT_URL) {
   console.warn("chatStreamUrl missing from amplify_outputs.json — chat drawer will not work");
 }
 
-export async function* streamChat({ message, sessionId }) {
+export async function* streamChat({ message, sessionId, pageContext }) {
   const { tokens } = await fetchAuthSession();
   const idToken = tokens?.idToken?.toString();
   if (!idToken) throw new Error("No auth token — please sign in");
@@ -17,7 +17,7 @@ export async function* streamChat({ message, sessionId }) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${idToken}`
     },
-    body: JSON.stringify({ message, sessionId })
+    body: JSON.stringify({ message, sessionId, pageContext })
   });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
 

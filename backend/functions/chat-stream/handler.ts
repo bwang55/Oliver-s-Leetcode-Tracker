@@ -210,7 +210,11 @@ const streamHandler = async (event: LambdaUrlEvent, responseStream: any /*, cont
   }
 
   // 2. Parse body
-  let body: { sessionId?: string; message?: string };
+  let body: {
+    sessionId?: string;
+    message?: string;
+    pageContext?: { problemId?: unknown; problemNumber?: unknown; problemTitle?: unknown };
+  };
   try {
     const raw = decodeBody(event);
     body = raw ? JSON.parse(raw) : {};
@@ -224,6 +228,17 @@ const streamHandler = async (event: LambdaUrlEvent, responseStream: any /*, cont
     writeJson(responseStream, 400, { error: "missing_message" });
     return;
   }
+
+  // pageContext is optional. The PWA includes it when the user is on a
+  // problem detail page so the tutor agent can answer "explain this" without
+  // needing to call find_problem.
+  const pageContext = body.pageContext && typeof body.pageContext === "object"
+    ? {
+        problemId: typeof body.pageContext.problemId === "string" ? body.pageContext.problemId : undefined,
+        problemNumber: typeof body.pageContext.problemNumber === "number" ? body.pageContext.problemNumber : undefined,
+        problemTitle: typeof body.pageContext.problemTitle === "string" ? body.pageContext.problemTitle : undefined
+      }
+    : undefined;
 
   // 3. Load or create session
   let session: ChatSessionRow;
@@ -252,7 +267,7 @@ const streamHandler = async (event: LambdaUrlEvent, responseStream: any /*, cont
   let lastRoute = session.agentRoute;
   try {
     try {
-      for await (const ev of runOrchestrator(ctx, session.messages, message)) {
+      for await (const ev of runOrchestrator(ctx, session.messages, message, pageContext)) {
         writeEvent(ev.type, ev);
         if ((ev as any).type === "route") lastRoute = (ev as any).route;
         if (ev.type === "done") finalAssistantMessage = (ev as any).finalMessage ?? "";

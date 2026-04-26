@@ -2,19 +2,23 @@ import type { ToolContext } from "../tools/_types.js";
 import { runCurator } from "./curator.js";
 import { runAnalyst } from "./analyst.js";
 import { runPlanner } from "./planner.js";
+import { runTutor } from "./tutor.js";
 import type { AgentMessage, AgentEvent } from "./_shared.js";
 
-type Route = "curator" | "analyst" | "planner" | "multi:analyst-then-planner";
+type Route = "curator" | "analyst" | "planner" | "tutor" | "multi:analyst-then-planner";
 
 const INTENT_SYSTEM_PROMPT = `You route user messages to exactly one agent. Reply with ONE word, no explanation, no code review, no quotes.
 
 Routes:
-- curator       — message contains code OR is about adding/updating/deleting problems in the tracker
+- curator       — message contains code (paste) OR is about adding/updating/deleting problems in the tracker
 - analyst       — questions about stats, history, or "how am I doing"
 - planner       — "what should I do next", recommendations, multi-day study plans
+- tutor         — "explain this", "讲讲这题", "walk me through", "add comments to my code", "annotate", "加注释"
 - multi:analyst-then-planner — explicit combo of analysis + plan ("analyze X then plan Y")
 
-The hard rule: **if the message contains a code block or function definition (def / class / function / public / void / fn / etc.) → reply "curator". No exceptions, even if the user just dumps code with no English text. Even if the code looks like a textbook solution and you'd love to give feedback. The curator agent will handle it.**
+The hard rule for code: **if the message contains a code block or function definition (def / class / function / public / void / fn / etc.) AND looks like the user is submitting/sharing a solution they wrote → reply "curator". The user is logging that they solved it. Curator handles add/update/delete.**
+
+But: **if the message asks for help understanding or annotating an EXISTING tracker entry (no fresh code paste) → reply "tutor".** "Explain #5", "讲讲这题", "add comments to my python" are all tutor.
 
 Examples:
 User: I just did Two Sum: def twoSum(nums, target): seen={}; for i,n in enumerate(nums): ...
@@ -28,6 +32,15 @@ Reply: analyst
 
 User: What should I tackle next?
 Reply: planner
+
+User: 讲讲这道题
+Reply: tutor
+
+User: Can you explain Longest Palindromic Substring?
+Reply: tutor
+
+User: Add comments to my python solution
+Reply: tutor
 
 User: Analyze my weak areas and give me a 7-day plan
 Reply: multi:analyst-then-planner
@@ -45,7 +58,7 @@ async function classifyIntent(ctx: ToolContext, userMessage: string, history: Ag
     ]
   });
   const text = resp.choices[0]?.message?.content?.trim().toLowerCase() ?? "analyst";
-  const valid: Route[] = ["curator", "analyst", "planner", "multi:analyst-then-planner"];
+  const valid: Route[] = ["curator", "analyst", "planner", "tutor", "multi:analyst-then-planner"];
   // Check most-specific first (multi: substring contains "analyst" and "planner" too)
   if (text.includes("multi")) return "multi:analyst-then-planner";
   return valid.find((v) => text.includes(v)) ?? "analyst";
@@ -64,9 +77,29 @@ function obviouslyCode(s: string): boolean {
   );
 }
 
+export interface PageContext {
+  /** The internal Problem.id (UUID) the user is currently viewing in the UI, if any. */
+  problemId?: string;
+  /** Human-friendly hint included in the prompt so the model has more anchors. */
+  problemNumber?: number;
+  problemTitle?: string;
+}
+
 export async function* runOrchestrator(
-  ctx: ToolContext, history: AgentMessage[], userMessage: string
+  ctx: ToolContext,
+  history: AgentMessage[],
+  userMessage: string,
+  pageContext?: PageContext
 ): AsyncIterable<AgentEvent | { type: "route"; route: Route; reason: string }> {
+  // If the user is on a problem detail page, splice the context into the user
+  // message so every downstream agent sees it without changing call signatures.
+  const augmentedUserMessage = pageContext?.problemId
+    ? `[pageContext: viewing problem id="${pageContext.problemId}"`
+      + (pageContext.problemNumber ? `, number=${pageContext.problemNumber}` : "")
+      + (pageContext.problemTitle ? `, title="${pageContext.problemTitle}"` : "")
+      + `]\n${userMessage}`
+    : userMessage;
+
   let route: Route;
   let reason: string;
   if (obviouslyCode(userMessage)) {
@@ -78,13 +111,14 @@ export async function* runOrchestrator(
   }
   yield { type: "route", route, reason };
 
-  if (route === "curator") yield* runCurator(ctx, history, userMessage);
-  else if (route === "analyst") yield* runAnalyst(ctx, history, userMessage);
-  else if (route === "planner") yield* runPlanner(ctx, history, userMessage);
+  if (route === "curator") yield* runCurator(ctx, history, augmentedUserMessage);
+  else if (route === "analyst") yield* runAnalyst(ctx, history, augmentedUserMessage);
+  else if (route === "planner") yield* runPlanner(ctx, history, augmentedUserMessage);
+  else if (route === "tutor") yield* runTutor(ctx, history, augmentedUserMessage);
   else {
     // multi:analyst-then-planner
     let analystSummary = "";
-    for await (const ev of runAnalyst(ctx, history, userMessage)) {
+    for await (const ev of runAnalyst(ctx, history, augmentedUserMessage)) {
       yield ev;
       if (ev.type === "done") analystSummary = ev.finalMessage;
     }
