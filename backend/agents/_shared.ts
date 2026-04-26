@@ -1,0 +1,107 @@
+import type { ToolContext } from "../tools/_types.js";
+import { toolByName } from "../tools/index.js";
+
+export interface AgentMessage {
+  role: "user" | "assistant" | "tool" | "system";
+  content: string | Array<any> | null;
+  tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+  tool_call_id?: string;
+}
+
+export type AgentEvent =
+  | { type: "thinking"; agent: string; delta: string }
+  | { type: "tool_call"; id: string; tool: string; args: any }
+  | { type: "tool_result"; id: string; result: any; durationMs: number; error?: string }
+  | { type: "done"; finalMessage: string };
+
+const MAX_TOOL_CALLS = 10;
+const AGENT_TIMEOUT_MS = 30_000;
+
+export async function* runAgent(
+  ctx: ToolContext,
+  args: {
+    name: string;
+    systemPrompt: string;
+    allowedTools: string[];
+    model: string;
+    history: AgentMessage[];
+    userMessage: string;
+  }
+): AsyncIterable<AgentEvent> {
+  const start = Date.now();
+  const tools = args.allowedTools.map((n) => {
+    const t = toolByName(n);
+    return {
+      type: "function" as const,
+      function: { name: t.name, description: t.description, parameters: t.jsonSchema }
+    };
+  });
+
+  const messages: any[] = [
+    { role: "system", content: args.systemPrompt },
+    ...args.history.map((m) => ({ role: m.role, content: m.content, tool_calls: m.tool_calls, tool_call_id: m.tool_call_id })),
+    { role: "user", content: args.userMessage }
+  ];
+
+  let iter = 0;
+  while (iter < MAX_TOOL_CALLS) {
+    if (Date.now() - start > AGENT_TIMEOUT_MS) throw new Error("AGENT_TIMEOUT");
+    iter++;
+
+    const resp = await ctx.openai.chat.completions.create({
+      model: args.model,
+      max_tokens: 2048,
+      tools: tools as any,
+      messages
+    });
+
+    const message = resp.choices[0].message;
+    const finishReason = resp.choices[0].finish_reason;
+
+    if (message.content) {
+      yield { type: "thinking", agent: args.name, delta: message.content };
+    }
+
+    const toolCalls = message.tool_calls ?? [];
+    if (toolCalls.length === 0 || finishReason === "stop") {
+      const finalMessage = message.content ?? "";
+      yield { type: "done", finalMessage };
+      return;
+    }
+
+    // Persist the assistant turn (with its tool_calls) before adding tool results
+    messages.push({
+      role: "assistant",
+      content: message.content,
+      tool_calls: toolCalls
+    });
+
+    for (const tc of toolCalls) {
+      const args_obj = (() => { try { return JSON.parse(tc.function.arguments); } catch { return {}; } })();
+      yield { type: "tool_call", id: tc.id, tool: tc.function.name, args: args_obj };
+      const t = toolByName(tc.function.name);
+      const tStart = Date.now();
+      try {
+        const validated = t.inputSchema.parse(args_obj);
+        const result = await t.execute(ctx, validated);
+        const durationMs = Date.now() - tStart;
+        yield { type: "tool_result", id: tc.id, result, durationMs };
+        messages.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: JSON.stringify(result)
+        });
+      } catch (err: any) {
+        const durationMs = Date.now() - tStart;
+        yield { type: "tool_result", id: tc.id, result: null, durationMs, error: err.message };
+        messages.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: JSON.stringify({ error: err.message })
+        });
+      }
+    }
+  }
+
+  throw new Error("MAX_TOOL_CALLS_EXCEEDED");
+}
