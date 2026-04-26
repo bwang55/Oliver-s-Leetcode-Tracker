@@ -60,7 +60,7 @@ function Heatmap({ cells, onCellClick }) {
         <span>more</span>
       </div>
       {tip && (
-        <div className="heat-tip" style={{ left: tip.x, top: tip.y, transform: "translate(-50%, -100%)" }}>
+        <div className="heat-tip" style={{ left: tip.x, top: tip.y }}>
           <div className="heat-tip-main">
             {tip.count > 0 ? tip.count + " problem" + (tip.count > 1 ? "s" : "") : "No problems"}
           </div>

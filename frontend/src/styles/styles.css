@@ -429,15 +429,20 @@ textarea {
 .heatmap-grid {
   display: grid;
   grid-auto-flow: column;
+  grid-template-columns: repeat(16, 1fr);
   grid-template-rows: repeat(7, 1fr);
   gap: 3px;
-  flex: 1;
-  min-height: 84px;
+  /* The whole grid is 16:7 in cell layout. With both axes sized as 1fr × 1fr
+   * AND the container at this aspect ratio, each cell ends up square — without
+   * the per-cell aspect-ratio fighting the row template at large widths. */
+  aspect-ratio: 16 / 7;
+  width: 100%;
+  align-self: center;
   padding: 4px;
 }
 .heatmap-cell {
-  aspect-ratio: 1;
-  min-height: 11px;
+  min-height: 0;
+  min-width: 0;
   border-radius: 3px;
   background: var(--heat-0);
   cursor: pointer;
@@ -462,6 +467,10 @@ textarea {
   pointer-events: none;
   z-index: 100;
   white-space: nowrap;
+  /* Base transform centers horizontally on the cell and lifts above it. The
+   * keyframes below preserve this transform so the first frame doesn't flash
+   * at the cell's right edge before snapping into place. */
+  transform: translate(-50%, -100%);
   animation: tipIn 200ms var(--ease-out);
   box-shadow: var(--shadow-pop);
 }
@@ -485,8 +494,8 @@ textarea {
   transform: translateX(-50%) rotate(45deg);
 }
 @keyframes tipIn {
-  0% { opacity: 0; transform: translateY(4px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% { opacity: 0; transform: translate(-50%, calc(-100% + 4px)); }
+  100% { opacity: 1; transform: translate(-50%, -100%); }
 }
 .heatmap-legend {
   display: flex;
