@@ -24,15 +24,22 @@ applications:
           commands:
             # `appRoot: frontend` pins cwd to frontend/ for every phase, but the
             # Gen 2 backend (`amplify/`) and its CLI dep (`@aws-amplify/backend-cli`)
-            # live at repo root. Hop up before installing + invoking ampx.
+            # live at repo root. Two notes:
             #
-            # `npm install` (not `npm ci`) is intentional: Amplify CDK packages
-            # ship bundled deps that npm ci's strict validator rejects with
-            # "Missing: fast-xml-parser@... from lock file" even after a clean
-            # regenerate. install relaxes that check while still honoring the
-            # lockfile's pinned versions.
-            - cd .. && npm install
-            # Write `amplify_outputs.json` straight into the path the frontend
-            # imports from (locally this is a gitignored symlink to project root;
-            # CI doesn't have that symlink, so we point ampx there directly).
-            - cd .. && npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --outputs-out-dir frontend/src
+            # 1. Keep install + ampx invocation in a SINGLE command. Amplify
+            #    Hosting runs each list item as a fresh shell, and `npx ampx`
+            #    sometimes fails to see the freshly-installed bin from a prior
+            #    shell. Chaining with `&&` is the simplest way to guarantee the
+            #    same shell sees both the install and the bin.
+            #
+            # 2. `npm install` (not `npm ci`) — Amplify CDK packages ship bundled
+            #    deps that npm ci's strict validator rejects ("Missing:
+            #    fast-xml-parser@... from lock file") even after a clean
+            #    regenerate. install relaxes that check while still honoring the
+            #    lockfile's pinned versions.
+            #
+            # `--outputs-out-dir frontend/src` writes `amplify_outputs.json`
+            # straight into the path the frontend imports from (locally this is
+            # a gitignored symlink to project root; CI doesn't have that
+            # symlink, so we point ampx there directly).
+            - cd .. && npm install && npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --outputs-out-dir frontend/src
