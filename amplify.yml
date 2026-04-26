@@ -25,7 +25,13 @@ applications:
             # `appRoot: frontend` pins cwd to frontend/ for every phase, but the
             # Gen 2 backend (`amplify/`) and its CLI dep (`@aws-amplify/backend-cli`)
             # live at repo root. Hop up before installing + invoking ampx.
-            - cd .. && npm ci
+            #
+            # `npm install` (not `npm ci`) is intentional: Amplify CDK packages
+            # ship bundled deps that npm ci's strict validator rejects with
+            # "Missing: fast-xml-parser@... from lock file" even after a clean
+            # regenerate. install relaxes that check while still honoring the
+            # lockfile's pinned versions.
+            - cd .. && npm install
             # Write `amplify_outputs.json` straight into the path the frontend
             # imports from (locally this is a gitignored symlink to project root;
             # CI doesn't have that symlink, so we point ampx there directly).
