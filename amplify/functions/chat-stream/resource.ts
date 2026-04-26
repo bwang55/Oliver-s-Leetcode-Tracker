@@ -15,8 +15,11 @@ export const chatStream = defineFunction({
     OPENAI_API_KEY: secret("OPENAI_API_KEY"),
     AI_DAILY_RATE_LIMIT: "50",
     MCP_TOOL_DAILY_LIMIT: "200",
-    OPENAI_MODEL_EXTRACTION: "gpt-5",
-    OPENAI_MODEL_REASONING: "gpt-5",
+    // Speed > peak quality for portfolio demo. gpt-5 reasoning takes ~14s/call;
+    // gpt-5-mini takes ~2-3s and is plenty for structured extraction and short agent
+    // turns. Override per-environment if you want full gpt-5 in prod.
+    OPENAI_MODEL_EXTRACTION: "gpt-5-mini",
+    OPENAI_MODEL_REASONING: "gpt-5-mini",
     OPENAI_MODEL_INTENT: "gpt-5-mini"
   }
 });

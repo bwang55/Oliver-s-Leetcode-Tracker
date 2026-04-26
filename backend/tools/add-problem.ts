@@ -75,6 +75,14 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
 
   const toolCall = response.choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall || toolCall.function?.name !== "record_extraction") {
+    console.error("add_problem AI_INVALID_RESPONSE: no tool_call", {
+      finishReason: response.choices?.[0]?.finish_reason,
+      messageContent: response.choices?.[0]?.message?.content,
+      messageRefusal: (response.choices?.[0]?.message as any)?.refusal,
+      toolCalls: response.choices?.[0]?.message?.tool_calls,
+      model: response.model,
+      usage: response.usage
+    });
     throw new Error("AI_INVALID_RESPONSE");
   }
 
@@ -82,7 +90,12 @@ export async function addProblem(ctx: ToolContext, input: AddProblemInput) {
   try {
     const parsed = JSON.parse(toolCall.function.arguments);
     extraction = ExtractionResult.parse(parsed);
-  } catch {
+  } catch (err: any) {
+    console.error("add_problem AI_INVALID_RESPONSE: parse/validate failed", {
+      rawArgs: toolCall.function?.arguments,
+      parseError: err?.message,
+      zodIssues: err?.issues
+    });
     throw new Error("AI_INVALID_RESPONSE");
   }
 

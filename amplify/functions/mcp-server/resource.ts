@@ -14,8 +14,9 @@ export const mcpServer = defineFunction({
     OPENAI_API_KEY: secret("OPENAI_API_KEY"),
     AI_DAILY_RATE_LIMIT: "50",
     MCP_TOOL_DAILY_LIMIT: "200",
-    OPENAI_MODEL_EXTRACTION: "gpt-5",
-    OPENAI_MODEL_REASONING: "gpt-5",
+    // Mirror chat-stream defaults: gpt-5-mini for speed.
+    OPENAI_MODEL_EXTRACTION: "gpt-5-mini",
+    OPENAI_MODEL_REASONING: "gpt-5-mini",
     OPENAI_MODEL_INTENT: "gpt-5-mini"
   }
 });
