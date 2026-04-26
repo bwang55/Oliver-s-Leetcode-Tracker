@@ -1,4 +1,4 @@
-# Leetcode Tracker
+# Oliver's Leetcode Tracker
 
 A Leetcode practice tracker that takes any pasted solution, uses an LLM to auto-extract the problem metadata, and surfaces it in a heatmap-driven PWA. The backend is built around an MCP server: nine tools shared between an in-app multi-agent chat (Curator / Analyst / Planner specialized agents + an intent-classifier orchestrator) and external MCP clients like Claude Desktop.
 

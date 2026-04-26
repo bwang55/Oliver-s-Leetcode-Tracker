@@ -1,5 +1,5 @@
 {
-  "name": "leetcode-tracker-amplify-shim",
+  "name": "olivers-leetcode-tracker-amplify-shim",
   "private": true,
   "type": "module",
   "dependencies": {

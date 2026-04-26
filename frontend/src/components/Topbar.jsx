@@ -16,7 +16,7 @@ function Topbar(props) {
     <header className="topbar">
       <div className="brand">
         <div className="brand-mark">L</div>
-        <span>Leetcode Tracker</span>
+        <span>Oliver's Leetcode Tracker</span>
       </div>
       <div className="topbar-actions">
         <button className="icon-btn" aria-label="Search" onClick={props.onSearch}>

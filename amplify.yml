@@ -21,4 +21,7 @@ applications:
         build:
           commands:
             - npm ci
-            - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+            # Write `amplify_outputs.json` straight into the path the frontend
+            # imports from (locally this is a gitignored symlink to project root;
+            # CI doesn't have that symlink, so we point ampx there directly).
+            - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --outputs-out-dir frontend/src

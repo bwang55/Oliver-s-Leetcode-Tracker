@@ -511,7 +511,7 @@ export default function AuthPage({ onSignedIn }) {
         <span className="auth-mark" aria-hidden="true" />
         <div className="brand">
           <div className="brand-mark">L</div>
-          <span>Leetcode Tracker</span>
+          <span>Oliver's Leetcode Tracker</span>
         </div>
         <div className="auth-pull">
           <h1>
@@ -524,7 +524,7 @@ export default function AuthPage({ onSignedIn }) {
           </p>
         </div>
         <div className="auth-foot">
-          <span>© 2026 LC Tracker</span>
+          <span>© 2026 Oliver's LC Tracker</span>
           <span><a href="#">Terms</a> · <a href="#">Privacy</a></span>
         </div>
       </aside>

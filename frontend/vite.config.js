@@ -10,8 +10,8 @@ export default defineConfig({
       includeAssets: ["icon.svg", "apple-touch-icon.png"],
       manifestFilename: "manifest.webmanifest",
       manifest: {
-        name: "Leetcode Tracker",
-        short_name: "LC Tracker",
+        name: "Oliver's Leetcode Tracker",
+        short_name: "Oliver's LC",
         description: "Track your daily Leetcode practice with AI-extracted problems and tags.",
         start_url: "./",
         scope: "./",

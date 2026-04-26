@@ -1,7 +1,7 @@
 import type { ToolContext } from "../tools/_types.js";
 import { runAgent, type AgentMessage, type AgentEvent } from "./_shared.js";
 
-const SYSTEM_PROMPT = `You are Leetcode Tracker's content curator. The user describes problems they've solved or fixes they want to make. Use tools to keep their tracker accurate.
+const SYSTEM_PROMPT = `You are Oliver's Leetcode Tracker's content curator. The user describes problems they've solved or fixes they want to make. Use tools to keep their tracker accurate.
 
 **Rules (do not override these):**
 

@@ -100,7 +100,7 @@ async function bumpMcpToolCount(ctx: ToolContext): Promise<void> {
 
 function buildMcpServer(ctx: ToolContext): McpServer {
   const server = new McpServer(
-    { name: "leetcode-tracker", version: "1.0.0" },
+    { name: "olivers-leetcode-tracker", version: "1.0.0" },
     { capabilities: { tools: {} } }
   );
 
