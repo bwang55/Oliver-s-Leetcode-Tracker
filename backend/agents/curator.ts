@@ -1,5 +1,5 @@
 import type { ToolContext } from "../tools/_types.js";
-import { runAgent, type AgentMessage, type AgentEvent } from "./_shared.js";
+import { runAgent, buildPageContextHint, type AgentMessage, type AgentEvent, type PageContext } from "./_shared.js";
 
 const SYSTEM_PROMPT = `You are Oliver's Leetcode Tracker's content curator. The user describes problems they've solved or fixes they want to make. Use tools to keep their tracker accurate.
 
@@ -39,7 +39,10 @@ function looksLikeCode(s: string): boolean {
 }
 
 export function runCurator(
-  ctx: ToolContext, history: AgentMessage[], userMessage: string
+  ctx: ToolContext,
+  history: AgentMessage[],
+  userMessage: string,
+  pageContext?: PageContext
 ): AsyncIterable<AgentEvent> {
   return runAgent(ctx, {
     name: "curator",
@@ -50,6 +53,7 @@ export function runCurator(
     userMessage,
     // If the user pasted code, force `add_problem` on the first turn so the model
     // can't decide to lecture instead of saving.
-    forceToolFirstTurn: looksLikeCode(userMessage) ? "add_problem" : undefined
+    forceToolFirstTurn: looksLikeCode(userMessage) ? "add_problem" : undefined,
+    contextHint: buildPageContextHint(pageContext)
   });
 }

@@ -3,7 +3,9 @@ import { runCurator } from "./curator.js";
 import { runAnalyst } from "./analyst.js";
 import { runPlanner } from "./planner.js";
 import { runTutor } from "./tutor.js";
-import type { AgentMessage, AgentEvent } from "./_shared.js";
+import type { AgentMessage, AgentEvent, PageContext } from "./_shared.js";
+
+export type { PageContext } from "./_shared.js";
 
 type Route = "curator" | "analyst" | "planner" | "tutor" | "multi:analyst-then-planner";
 
@@ -77,29 +79,12 @@ function obviouslyCode(s: string): boolean {
   );
 }
 
-export interface PageContext {
-  /** The internal Problem.id (UUID) the user is currently viewing in the UI, if any. */
-  problemId?: string;
-  /** Human-friendly hint included in the prompt so the model has more anchors. */
-  problemNumber?: number;
-  problemTitle?: string;
-}
-
 export async function* runOrchestrator(
   ctx: ToolContext,
   history: AgentMessage[],
   userMessage: string,
   pageContext?: PageContext
 ): AsyncIterable<AgentEvent | { type: "route"; route: Route; reason: string }> {
-  // If the user is on a problem detail page, splice the context into the user
-  // message so every downstream agent sees it without changing call signatures.
-  const augmentedUserMessage = pageContext?.problemId
-    ? `[pageContext: viewing problem id="${pageContext.problemId}"`
-      + (pageContext.problemNumber ? `, number=${pageContext.problemNumber}` : "")
-      + (pageContext.problemTitle ? `, title="${pageContext.problemTitle}"` : "")
-      + `]\n${userMessage}`
-    : userMessage;
-
   let route: Route;
   let reason: string;
   if (obviouslyCode(userMessage)) {
@@ -111,14 +96,17 @@ export async function* runOrchestrator(
   }
   yield { type: "route", route, reason };
 
-  if (route === "curator") yield* runCurator(ctx, history, augmentedUserMessage);
-  else if (route === "analyst") yield* runAnalyst(ctx, history, augmentedUserMessage);
-  else if (route === "planner") yield* runPlanner(ctx, history, augmentedUserMessage);
-  else if (route === "tutor") yield* runTutor(ctx, history, augmentedUserMessage);
+  // pageContext is passed through so agents can inject it into their system
+  // prompts (much more reliable than embedding it in the user message — see
+  // buildPageContextHint in _shared.ts).
+  if (route === "curator") yield* runCurator(ctx, history, userMessage, pageContext);
+  else if (route === "analyst") yield* runAnalyst(ctx, history, userMessage);
+  else if (route === "planner") yield* runPlanner(ctx, history, userMessage);
+  else if (route === "tutor") yield* runTutor(ctx, history, userMessage, pageContext);
   else {
     // multi:analyst-then-planner
     let analystSummary = "";
-    for await (const ev of runAnalyst(ctx, history, augmentedUserMessage)) {
+    for await (const ev of runAnalyst(ctx, history, userMessage)) {
       yield ev;
       if (ev.type === "done") analystSummary = ev.finalMessage;
     }

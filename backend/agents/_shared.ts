@@ -17,6 +17,30 @@ export type AgentEvent =
 const MAX_TOOL_CALLS = 10;
 const AGENT_TIMEOUT_MS = 30_000;
 
+export interface PageContext {
+  /** The internal Problem.id (UUID) the user is currently viewing in the UI, if any. */
+  problemId?: string;
+  problemNumber?: number;
+  problemTitle?: string;
+}
+
+/** Format a PageContext into a system-level instruction block. */
+export function buildPageContextHint(pc?: PageContext): string | undefined {
+  if (!pc?.problemId) return undefined;
+  const labelParts = [
+    pc.problemNumber ? `#${pc.problemNumber}` : null,
+    pc.problemTitle || null
+  ].filter(Boolean);
+  const label = labelParts.length > 0 ? ` (${labelParts.join(" ")})` : "";
+  return [
+    `**CURRENT PAGE CONTEXT**: The user is currently viewing problem id="${pc.problemId}"${label} in the UI.`,
+    "",
+    "When the user says \"this problem\", \"this\", \"these\", \"讲讲这题\", \"give me\", \"explain\", \"add comments\", or any pronoun-based reference WITHOUT naming a problem — they mean the problem with the id above.",
+    "",
+    `Use \`id: "${pc.problemId}"\` directly when calling \`explain_problem\`, \`add_comments_to_code\`, \`get_problem\`, \`update_problem\`, or \`delete_problem\`. Do NOT call \`find_problem\` first — you already have the id.`
+  ].join("\n");
+}
+
 export async function* runAgent(
   ctx: ToolContext,
   args: {
@@ -28,6 +52,10 @@ export async function* runAgent(
     userMessage: string;
     /** Force a specific tool on the FIRST iteration only. Subsequent iterations use "auto". */
     forceToolFirstTurn?: string;
+    /** Optional system-level context (e.g. "user is currently viewing problem id=...").
+     *  Appended to systemPrompt so the model treats it as authoritative — much more
+     *  reliable than embedding the same info in the user message. */
+    contextHint?: string;
   }
 ): AsyncIterable<AgentEvent> {
   const start = Date.now();
@@ -39,8 +67,12 @@ export async function* runAgent(
     };
   });
 
+  const fullSystemPrompt = args.contextHint
+    ? `${args.systemPrompt}\n\n---\n\n${args.contextHint}`
+    : args.systemPrompt;
+
   const messages: any[] = [
-    { role: "system", content: args.systemPrompt },
+    { role: "system", content: fullSystemPrompt },
     ...args.history.map((m) => ({ role: m.role, content: m.content, tool_calls: m.tool_calls, tool_call_id: m.tool_call_id })),
     { role: "user", content: args.userMessage }
   ];

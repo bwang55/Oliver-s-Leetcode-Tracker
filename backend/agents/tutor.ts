@@ -1,5 +1,5 @@
 import type { ToolContext } from "../tools/_types.js";
-import { runAgent, type AgentMessage, type AgentEvent } from "./_shared.js";
+import { runAgent, buildPageContextHint, type AgentMessage, type AgentEvent, type PageContext } from "./_shared.js";
 
 const SYSTEM_PROMPT = `You are a Leetcode tutor helping someone preparing for interviews. Your job is to explain problems and annotate code — not to write code from scratch, not to lecture, not to manage their tracker.
 
@@ -24,13 +24,18 @@ You have two main capabilities:
 const ALLOWED_TOOLS = ["get_problem", "find_problem", "explain_problem", "add_comments_to_code"];
 
 export function runTutor(
-  ctx: ToolContext, history: AgentMessage[], userMessage: string
+  ctx: ToolContext,
+  history: AgentMessage[],
+  userMessage: string,
+  pageContext?: PageContext
 ): AsyncIterable<AgentEvent> {
   return runAgent(ctx, {
     name: "tutor",
     systemPrompt: SYSTEM_PROMPT,
     allowedTools: ALLOWED_TOOLS,
     model: ctx.env.OPENAI_MODEL_REASONING,
-    history, userMessage
+    history,
+    userMessage,
+    contextHint: buildPageContextHint(pageContext)
   });
 }
